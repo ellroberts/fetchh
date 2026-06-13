@@ -1,0 +1,11 @@
+{
+  "name": "threadcub",
+  "description": "ThreadCub memory for Claude — save conversations, highlights, actions, and reminders. Pull relevant context from your history into any session.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Elliot Roberts",
+    "url": "https://threadcub.com"
+  },
+  "homepage": "https://threadcub.com",
+  "repository": "https://github.com/codacub/threadcub-app-mvp"
+}

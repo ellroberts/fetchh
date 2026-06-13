@@ -1,0 +1,99 @@
+[01;34m.[0m
+├── [00mCONVERSATION_LENGTH_DETECTION_ASSESSMENT.md[0m
+├── [00mLICENSE[0m
+├── [00mREADME.md[0m
+├── [01;34massets[0m
+│   ├── [00manchor.css[0m
+│   ├── [00mconversation-prompt.css[0m
+│   ├── [00mfloating-button.css[0m
+│   ├── [01;34mimages[0m
+│   │   ├── [00mContinue-convo.png[0m
+│   │   ├── [00mTag-stuff.png[0m
+│   │   ├── [00mchatgpt-icon.svg[0m
+│   │   ├── [00mclaude-ai-icon.svg[0m
+│   │   ├── [01;35mcontinue-the-chat.gif[0m
+│   │   ├── [00mdeepseek-icon.svg[0m
+│   │   ├── [00mgemini-icon.svg[0m
+│   │   ├── [00mgrok-icon.svg[0m
+│   │   ├── [01;35mmove-the-cub.gif[0m
+│   │   ├── [00mperplexity-icon.svg[0m
+│   │   └── [01;35mtagg-test-1.gif[0m
+│   ├── [00mside-panel.css[0m
+│   └── [00mtokens.css[0m
+├── [00mbackground.js[0m
+├── [01;34mbuild[0m
+│   ├── [01;31mthreadcub-extension-v1.0.4.zip[0m
+│   ├── [01;31mthreadcub-extension-v1.0.5.zip[0m
+│   └── [01;31mthreadcub-extension-v1.0.6.zip[0m
+├── [00mcontent.js[0m
+├── [01;34mdocs[0m
+│   ├── [00mPROJECT-AUDIT.md[0m
+│   └── [01;34mdevelopment[0m
+│       ├── [00mGROK_DEEPSEEK_TESTING.md[0m
+│       ├── [00mNO_BREAKING_CHANGES.md[0m
+│       └── [00mQUICK-START.md[0m
+├── [00mfiletree.txt[0m
+├── [01;34mfontwaesome[0m
+│   ├── [00mchevron-left.png[0m
+│   ├── [00mfa-check-circle-hover.png[0m
+│   ├── [00mfa-check-circle.png[0m
+│   ├── [00mfa-chevron-right-circle.png[0m
+│   ├── [00mfa-info-circle-hover.png[0m
+│   ├── [00mfa-info-circle.png[0m
+│   ├── [00mfa-paw-hover.png[0m
+│   └── [00mfa-paw.png[0m
+├── [01;34micons[0m
+│   ├── [00micon-48.png[0m
+│   ├── [00micon-happier.png[0m
+│   ├── [00micon-happy.png[0m
+│   ├── [00micon-sad.png[0m
+│   ├── [00micon128.png[0m
+│   ├── [00micon16.png[0m
+│   ├── [00micon32.png[0m
+│   ├── [00micon48.png[0m
+│   └── [00mthreadcub-logo.png[0m
+├── [00mmanifest.json[0m
+├── [00mplatformHandlers.js[0m
+├── [01;34mpopup[0m
+│   ├── [00mpopup (after launch).css[0m
+│   ├── [00mpopup (after launch).html[0m
+│   ├── [00mpopup (after launch).js[0m
+│   ├── [00mpopup.css[0m
+│   ├── [00mpopup.html[0m
+│   ├── [00mpopup.js[0m
+│   └── [01;34mstyles[0m
+│       ├── [00mbase.css[0m
+│       └── [00mcomponents.css[0m
+├── [00mremoved-tokens.css[0m
+├── [01;34msrc[0m
+│   ├── [01;34madapters[0m
+│   │   └── [00mplatform-adapters.js[0m
+│   ├── [01;34mcore[0m
+│   │   ├── [00mapp-initializer.js[0m
+│   │   ├── [00mconversation-extractor.js[0m
+│   │   └── [00mfloating-button.js[0m
+│   ├── [01;34mfeatures[0m
+│   │   ├── [00manchor-system.js[0m
+│   │   ├── [00mcontinuation-system.js[0m
+│   │   ├── [00mconversation-length-detector.js[0m
+│   │   ├── [00mcopilot-onboarding.js[0m
+│   │   ├── [00mdownload-manager.js[0m
+│   │   ├── [00mplatform-autostart.js[0m
+│   │   └── [00mtagging-system.js[0m
+│   ├── [01;34mservices[0m
+│   │   ├── [00manalytics.js[0m
+│   │   ├── [00mapi-service.js[0m
+│   │   └── [00mstorage-service.js[0m
+│   ├── [01;34mui[0m
+│   │   ├── [00mside-panel.js[0m
+│   │   └── [00mui-components.js[0m
+│   └── [01;34mutils[0m
+│       ├── [00mdesign-tokens.js[0m
+│       ├── [00mplatform-detector.js[0m
+│       └── [00mutilities.js[0m
+├── [00mtagging.js[0m
+├── [00mtest-simple.js[0m
+├── [00mthreadcub_popup_system.js[0m
+└── [00mwelcome.html[0m
+
+17 directories, 80 files

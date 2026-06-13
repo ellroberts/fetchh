@@ -1,0 +1,628 @@
+// app/(dashboard)/dashboard/page.tsx
+'use client'
+
+import { useState, useEffect } from 'react'
+import { FileText, MessageSquare, Sparkles, Bot, BarChart2, Lightbulb } from 'lucide-react'
+import { Icon } from '@/components/Icon'
+import { createSupabaseClient } from '../../../lib/supabase'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { StatsCard } from '@/components/StatsCard'
+import { EmptyState } from '@/components/EmptyState'
+import { SectionCard } from '@/components/SectionCard'
+import { Button } from '@/components/Button'
+import { Alert } from '@/components/Alert'
+import { ClaimBanner } from '@/components/ClaimBanner'
+import { ClaimModal } from '@/components/ClaimModal'
+import { useClaimBanner } from '@/lib/useClaimBanner'
+import { Heading } from '@/components/Heading'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface QuickSummary {
+  overview?: string
+  key_topics?: string[]
+  problems_solved?: string[]
+  reading_time_minutes?: number
+}
+
+interface ConversationRow {
+  message_count?: number
+  platform?: string
+  created_at: string
+  quick_summary?: QuickSummary | null
+  tags?: string | null
+}
+
+interface UserInsight {
+  insight_type: string
+  title: string
+  summary: string
+  count: number
+  sample_items: string[]
+  generated_at: string
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const PLATFORM_COLORS: Record<string, string> = {
+  claude:  '#D97757',
+  chatgpt: '#10a37f',
+  gemini:  '#4285F4',
+  unknown: '#9CA3AF',
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  claude:  'Claude',
+  chatgpt: 'ChatGPT',
+  gemini:  'Gemini',
+  unknown: 'Unknown',
+}
+
+const INSIGHT_ICONS: Record<string, string> = {
+  friction:     '🔥',
+  ai_errors:    '🤖',
+  rework:       '🔄',
+  breakthroughs:'💡',
+  recurring:    '⚠️',
+}
+
+
+
+function getPlatformColor(platform: string) {
+  return PLATFORM_COLORS[platform.toLowerCase()] ?? PLATFORM_COLORS.unknown
+}
+
+function getPlatformLabel(platform: string) {
+  return PLATFORM_LABELS[platform.toLowerCase()] ?? platform.charAt(0).toUpperCase() + platform.slice(1)
+}
+
+function getWeekLabels(n: number): string[] {
+  const labels: string[] = []
+  const now = new Date()
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now)
+    d.setDate(d.getDate() - i * 7)
+    labels.push(d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))
+  }
+  return labels
+}
+
+function getWeeklyCounts(conversations: ConversationRow[], weeks: number): number[] {
+  const now = new Date()
+  const counts = Array(weeks).fill(0)
+  conversations.forEach(c => {
+    const created = new Date(c.created_at)
+    const daysAgo = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
+    const weekIndex = weeks - 1 - Math.floor(daysAgo / 7)
+    if (weekIndex >= 0 && weekIndex < weeks) counts[weekIndex]++
+  })
+  return counts
+}
+
+function timeAgo(dateStr: string, now: number): string {
+  const diff = now - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+
+
+function ActivityChart({ counts, labels }: { counts: number[]; labels: string[] }) {
+  const max = Math.max(...counts, 1)
+  return (
+    <div>
+      <div className="flex items-end gap-2 h-28">
+        {counts.map((count, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>{count > 0 ? count : ''}</span>
+            <div
+              style={{
+                width: '100%',
+                borderRadius: '4px 4px 0 0',
+                transition: 'all 0.5s',
+                height: `${Math.max((count / max) * 88, count > 0 ? 8 : 2)}px`,
+                backgroundColor: count > 0 ? 'var(--color-primary-500)' : 'var(--color-border-default)',
+              }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 mt-2">
+        {labels.map((label, i) => (
+          <div key={i} className="flex-1 text-center">
+            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+
+  )
+}
+
+function PlatformBar({ platform, count, total }: { platform: string; count: number; total: number }) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0
+  const color = getPlatformColor(platform)
+  const label = getPlatformLabel(platform)
+  return (
+    <div className="flex items-center gap-3">
+      <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', width: '80px', flexShrink: 0 }}>{label}</span>
+      <div style={{ flex: 1, backgroundColor: 'var(--color-border-subtle)', borderRadius: '999px', height: '8px' }}>
+        <div style={{ height: '8px', borderRadius: '999px', transition: 'all 0.5s', width: `${pct}%`, backgroundColor: color }} />
+      </div>
+      <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-title)', width: '32px', textAlign: 'right' }}>{count}</span>
+    </div>
+  )
+}
+
+function TopicBadge({ topic }: { topic: string }) {
+  return (
+    <span style={{
+  display: 'inline-block',
+  padding: '4px 12px',
+  borderRadius: '999px',
+  fontSize: 'var(--font-size-xs)',
+  fontWeight: 'var(--font-weight-medium)',
+  backgroundColor: 'var(--color-state-hover-bg)',
+  color: 'var(--color-text-secondary)',
+  border: '1px solid var(--color-border-default)',
+  fontFamily: 'var(--font-family-primary)',
+}}>
+      {topic}
+    </span>
+  )
+}
+
+const INSIGHT_TOKEN_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  friction:      { bg: 'var(--color-alert-error-bg, #fef2f2)',   border: 'var(--color-error)',   text: 'var(--color-error)' },
+  ai_errors:     { bg: 'var(--color-alert-warning-bg)',          border: 'var(--color-warning)', text: 'var(--color-warning)' },
+  rework:        { bg: 'var(--color-alert-warning-bg)',          border: 'var(--color-warning)', text: 'var(--color-warning)' },
+  breakthroughs: { bg: 'var(--color-alert-success-bg)',          border: 'var(--color-success)', text: 'var(--color-success)' },
+  recurring:     { bg: 'var(--color-alert-info-bg)',             border: 'var(--color-info)',    text: 'var(--color-info)' },
+}
+
+function InsightCard({ insight }: { insight: UserInsight }) {
+  const colors = INSIGHT_TOKEN_COLORS[insight.insight_type] ?? INSIGHT_TOKEN_COLORS.friction
+  const icon = INSIGHT_ICONS[insight.insight_type] ?? '📊'
+  return (
+    <div style={{
+      borderRadius: 'var(--border-radius-lg)',
+      border: `1px solid ${colors.border}`,
+      padding: 'var(--spacing-5)',
+      backgroundColor: colors.bg,
+      fontFamily: 'var(--font-family-primary)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 'var(--spacing-3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
+          <span style={{ fontSize: '1.25rem' }}>{icon}</span>
+          <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: colors.text }}>{insight.title}</span>
+        </div>
+        <span style={{ fontSize: '1.25rem', fontWeight: 'var(--font-weight-bold)', color: colors.text }}>{insight.count}</span>
+      </div>
+      <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-body)', marginBottom: 'var(--spacing-3)' }}>{insight.summary}</p>
+      {insight.sample_items.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-1)' }}>
+          {insight.sample_items.map((item, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
+              <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--color-border-default)', flexShrink: 0 }} />
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function InsightCardBlurred({ title, icon }: { title: string; icon: string }) {
+  return (
+    <div style={{
+      borderRadius: 'var(--border-radius-lg)',
+      border: '1px solid var(--color-border-default)',
+      padding: 'var(--spacing-5)',
+      backgroundColor: 'var(--color-card-default)',
+      position: 'relative',
+      overflow: 'hidden',
+      fontFamily: 'var(--font-family-primary)',
+    }}>
+      <div style={{ filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 'var(--spacing-3)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
+            <span style={{ fontSize: '1.25rem' }}>{icon}</span>
+            <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-secondary)' }}>{title}</span>
+          </div>
+          <span style={{ fontSize: '1.25rem', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-muted)' }}>—</span>
+        </div>
+        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-3)' }}>Insight data will appear here for Pro users.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-1)' }}>
+          {['Example conversation one', 'Example conversation two'].map((item, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
+              <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--color-border-default)', flexShrink: 0 }} />
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{
+          backgroundColor: 'transparent',
+          border: '1px solid var(--color-border-default)',
+          borderRadius: '999px',
+          padding: '4px 12px',
+          fontSize: 'var(--font-size-xs)',
+          fontWeight: 'var(--font-weight-medium)',
+          color: 'var(--color-text-secondary)',
+          boxShadow: 'var(--shadow-card)',
+        }}>Pro only</span>
+      </div>
+    </div>
+
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function DashboardPage() {
+  const [loading, setLoading] = useState(true)
+  const [showConfirmMessage, setShowConfirmMessage] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [clientNow, setClientNow] = useState(0)
+
+  useEffect(() => {
+    setClientNow(Date.now())
+  }, [])
+
+  const [conversations, setConversations] = useState<ConversationRow[]>([])
+  const [subscriptionTier, setSubscriptionTier] = useState<string>('free')
+
+  // AI Insights
+  const [insights, setInsights] = useState<UserInsight[]>([])
+  const [insightsGeneratedAt, setInsightsGeneratedAt] = useState<string | null>(null)
+  const [insightsLoading, setInsightsLoading] = useState(false)
+  const [insightsError, setInsightsError] = useState<string | null>(null)
+
+  const supabase = createSupabaseClient()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get('confirmed') === 'true') {
+      setShowConfirmMessage(true)
+      setTimeout(() => setShowConfirmMessage(false), 5000)
+    }
+    loadDashboardData()
+  }, [])
+
+  const loadDashboardData = async () => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) return
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('subscription_tier')
+        .eq('id', user.id)
+        .single()
+      const tier = profile?.subscription_tier ?? 'free'
+      setSubscriptionTier(tier)
+
+      const { data } = await supabase
+        .from('conversations')
+        .select('message_count, platform, created_at, quick_summary, tags')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      setConversations(data || [])
+      await checkClaimableConversations()
+
+      // Load cached insights if Pro/Unlimited
+      if (tier === 'pro' || tier === 'unlimited') {
+        await loadCachedInsights()
+      }
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadCachedInsights = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const res = await fetch('/api/insights/generate', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) return
+      const json = await res.json()
+      if (json.insights?.length > 0) {
+        setInsights(json.insights)
+        setInsightsGeneratedAt(json.generated_at)
+      }
+    } catch (err) {
+      console.error('Failed to load cached insights:', err)
+    }
+  }
+
+  const generateInsights = async () => {
+    setInsightsLoading(true)
+    setInsightsError(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const res = await fetch('/api/insights/generate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setInsightsError(json.error || 'Failed to generate insights')
+        return
+      }
+      setInsights(json.insights)
+      setInsightsGeneratedAt(json.generated_at)
+    } catch (err: any) {
+      setInsightsError(err.message || 'Failed to generate insights')
+    } finally {
+      setInsightsLoading(false)
+    }
+  }
+
+  // ── Derived stats ────────────────────────────────────────────────────────────
+
+  const conversationCount = conversations.length
+
+  // Claim banner
+  const {
+    claimableConversations,
+    showClaimBanner,
+    showClaimModal,
+    claiming,
+    checkClaimableConversations,
+    claimConversations,
+    setShowClaimModal,
+    claimBannerProps,
+  } = useClaimBanner({
+    onClaimSuccess: loadDashboardData,
+    conversationCount,
+    subscriptionTier,
+  })
+  const totalMessages = conversations.reduce((sum, c) => sum + (c.message_count || 0), 0)
+  const avgMessages = conversationCount > 0 ? Math.round(totalMessages / conversationCount) : 0
+
+  const platformBreakdown: Record<string, number> = {}
+  conversations.forEach(c => {
+    const p = (c.platform || 'unknown').toLowerCase()
+    platformBreakdown[p] = (platformBreakdown[p] || 0) + 1
+  })
+  const sortedPlatforms = Object.entries(platformBreakdown).sort((a, b) => b[1] - a[1])
+  const topPlatform = sortedPlatforms[0]
+
+  const WEEKS = 8
+  const weekLabels = getWeekLabels(WEEKS)
+  const weeklyCounts = getWeeklyCounts(conversations, WEEKS)
+
+  const topicCounts: Record<string, number> = {}
+  conversations.forEach(c => {
+    const topics = c.quick_summary?.key_topics ?? []
+    topics.forEach(t => {
+      const key = t.toLowerCase().trim()
+      topicCounts[key] = (topicCounts[key] || 0) + 1
+    })
+  })
+  const topTopics = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([topic]) => topic)
+
+  const allProblems: string[] = []
+  conversations.forEach(c => {
+    const problems = c.quick_summary?.problems_solved ?? []
+    problems.forEach(p => allProblems.push(p))
+  })
+  const problemsCount = allProblems.length
+  const summarisedCount = conversations.filter(c => c.quick_summary != null).length
+
+  const isProOrAbove = subscriptionTier === 'pro' || subscriptionTier === 'unlimited'
+
+  // ── Loading ──────────────────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 md:p-8">
+        <div className="text-center py-12">
+          <div className="text-4xl mb-4">🔄</div>
+          <div>Loading your dashboard...</div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="max-w-7xl mx-auto">
+      <div style={{ padding: "var(--spacing-8)", display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
+
+        {showConfirmMessage && (
+          <Alert type="success">Email confirmed. Welcome to ThreadCub!</Alert>
+        )}
+
+        {showClaimBanner && (
+          <ClaimBanner
+            {...claimBannerProps}
+            onReview={() => {
+              if (conversationCount >= 10 && subscriptionTier === 'free') {
+                router.push('/settings/billing')
+              } else {
+                setShowClaimModal(true)
+              }
+            }}
+          />
+        )}
+
+        {/* ── Stats Row ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--spacing-4)" }}>
+          <StatsCard label="Conversations" value={conversationCount} accent="teal" isEmpty={conversationCount === 0}
+            icon={<Icon icon={FileText} size="xl" color="var(--color-accent-teal)" />}
+          />
+          <StatsCard label="Total Messages" value={totalMessages} accent="blue" subtitle={`~${avgMessages} per conversation`} isEmpty={totalMessages === 0}
+            icon={<Icon icon={MessageSquare} size="xl" color="var(--color-accent-blue)" />}
+          />
+          <StatsCard label="Problems Solved" value={problemsCount} accent="amber" subtitle={`across ${summarisedCount} analysed threads`} isEmpty={problemsCount === 0}
+            icon={<Icon icon={Sparkles} size="xl" color="var(--color-accent-amber)" />}
+          />
+          <StatsCard label="Top Platform" value={topPlatform ? getPlatformLabel(topPlatform[0]) : '—'} accent="blue" isEmpty={!topPlatform}
+            subtitle={topPlatform ? `${topPlatform[1]} conversation${topPlatform[1] !== 1 ? 's' : ''}` : 'No conversations yet'}
+            icon={<Icon icon={Bot} size="xl" color="var(--color-accent-blue)" />}
+          />
+        </div>
+
+        {/* ── Activity + Platform ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "var(--spacing-4)" }}>
+          <SectionCard>
+            {conversationCount === 0 ? (
+              <EmptyState icon={BarChart2} iconColor="var(--color-accent-teal)" title="Thread Count" subtitle="This is where all your activity will show up." action={{ label: 'Get started', onClick: () => router.push('/import'), variant: 'primary' }} />
+            ) : (
+              <ActivityChart counts={weeklyCounts} labels={weekLabels} />
+            )}
+          </SectionCard>
+
+          <SectionCard>
+            {sortedPlatforms.length === 0 ? (
+              <EmptyState icon={Bot} iconColor="var(--color-accent-amber)" title="AI Platforms" subtitle="This will show once you get started." action={{ label: 'Learn more', onClick: () => router.push('/import'), variant: 'secondary' }} />
+            ) : (
+              <div className="space-y-3 mt-2">
+                {sortedPlatforms.map(([platform, count]) => (
+                  <PlatformBar key={platform} platform={platform} count={count} total={conversationCount} />
+                ))}
+              </div>
+            )}
+          </SectionCard>
+        </div>
+
+        {/* ── Topics ── */}
+        <SectionCard
+          title={topTopics.length > 0 ? 'Top Topics' : undefined}
+          subtitle={topTopics.length > 0 ? 'Most frequent themes across your conversations' : undefined}
+        >
+          {topTopics.length === 0 ? (
+            <EmptyState icon={MessageSquare} iconColor="var(--color-accent-blue)" title="Top Topics" subtitle="This will show once you get started." action={{ label: 'Learn more', onClick: () => router.push('/threads'), variant: 'secondary' }} />
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {topTopics.map(topic => <TopicBadge key={topic} topic={topic} />)}
+            </div>
+          )}
+        </SectionCard>
+
+        {/* ── Recently Solved ── */}
+        {allProblems.length > 0 && (
+          <SectionCard>
+            <Heading level={3} margin="sm">Recently Solved</Heading>
+            <p className="text-xs text-muted-foreground/70 mb-4">Problems addressed in your recent conversations</p>
+            <ul className="space-y-2">
+              {allProblems.slice(0, 8).map((problem, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-foreground/80">
+                  <span className="mt-0.5 shrink-0 w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs">✓</span>
+                  {problem}
+                </li>
+              ))}
+            </ul>
+            {allProblems.length > 8 && (
+              <p className="text-xs text-muted-foreground/70 mt-3">+{allProblems.length - 8} more across your threads</p>
+            )}
+          </SectionCard>
+        )}
+
+        {/* ── AI Insights ── */}
+        <SectionCard
+          title="AI Insights"
+          subtitle="Semantic analysis across all your conversations"
+          action={isProOrAbove ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-3)' }}>
+              {insightsGeneratedAt && (
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>{clientNow > 0 ? `Updated ${timeAgo(insightsGeneratedAt, clientNow)}` : ''}</span>
+              )}
+              <Button variant="secondary" size="sm" onClick={generateInsights} disabled={insightsLoading} loading={insightsLoading}>
+                {insights.length === 0 ? 'Generate Insights' : 'Refresh'}
+              </Button>
+            </div>
+          ) : undefined}
+        >
+          {/* Paywall — Free & Starter */}
+          {!isProOrAbove && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--spacing-4)' }}>
+                <InsightCardBlurred title="Friction & Breakages" icon="🔥" />
+                <InsightCardBlurred title="AI Mistakes & Corrections" icon="🤖" />
+                <InsightCardBlurred title="Rework Sessions" icon="🔄" />
+              </div>
+              <div style={{
+                borderRadius: 'var(--border-radius-lg)',
+                background: 'linear-gradient(135deg, var(--color-primary-bg), var(--color-accent-blue-bg))',
+                border: '1px solid var(--color-primary-light)',
+                padding: 'var(--spacing-6)',
+                textAlign: 'center',
+              }}>
+                <p style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-title)', marginBottom: 'var(--spacing-2)' }}>Unlock AI Insights with Pro</p>
+                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-body)', maxWidth: 400, margin: '0 auto var(--spacing-4)' }}>
+                  Discover patterns across all your conversations — where the AI went wrong, what keeps breaking, recurring problems, and your biggest breakthroughs.
+                </p>
+                <Button variant="primary" size="sm" onClick={() => router.push('/settings/billing')}>
+                  Upgrade to Pro - £16/mo
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Pro — no insights yet */}
+          {isProOrAbove && insights.length === 0 && !insightsLoading && (
+            <EmptyState
+              icon={Lightbulb}
+              iconColor="var(--color-accent-amber)"
+              title="No insights yet"
+              subtitle="Click Generate Insights to analyse patterns across your conversations."
+            />
+          )}
+
+          {/* Pro — loading */}
+          {isProOrAbove && insightsLoading && (
+            <div style={{ textAlign: 'center', padding: 'var(--spacing-10) var(--spacing-6)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+              <p>Analysing your conversations…</p>
+              <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: 'var(--spacing-1)' }}>This takes 10–20 seconds</p>
+            </div>
+          )}
+
+          {/* Pro — error */}
+          {isProOrAbove && insightsError && (
+            <Alert type="error" style={{ marginTop: 'var(--spacing-4)' }}>
+              {insightsError}
+            </Alert>
+          )}
+
+          {/* Pro — results */}
+          {isProOrAbove && insights.length > 0 && !insightsLoading && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--spacing-4)', marginTop: 'var(--spacing-4)' }}>
+              {insights.map(insight => (
+                <InsightCard key={insight.insight_type} insight={insight} />
+              ))}
+            </div>
+          )}
+        </SectionCard>
+
+      </div>
+      {/* Claim Modal */}
+      {showClaimModal && (
+        <ClaimModal
+          conversations={claimableConversations}
+          onClaim={claimConversations}
+          onCancel={() => setShowClaimModal(false)}
+          claiming={claiming}
+        />
+      )}
+    </div>
+
+
+  )
+}

@@ -1,0 +1,252 @@
+/* =============================================================================
+   ThreadCub Base Styles - Reset, Typography, and Layout Fundamentals
+   ============================================================================= */
+
+/* ===== RESET ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ===== HTML & BODY ===== */
+html, body {
+    font-family: var(--font-family-system);
+    width: 380px;
+    height: 600px;
+    max-width: 380px;
+    max-height: 600px;
+    background: var(--color-white);
+    color: #333;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+/* ===== POPUP CONTAINER ===== */
+.popup-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 380px;
+    height: 600px;
+}
+
+/* ===== NAVIGATION RADIO BUTTONS ===== */
+.nav-radio {
+    display: none;
+}
+
+/* ===== WORKING CSS NAVIGATION ===== */
+/* Hide all views by default */
+.popup-container .view {
+    display: none !important;
+}
+
+/* Show specific view when radio is checked */
+.popup-container input[type="radio"]#nav-main:checked ~ .view-container #mainView,
+.popup-container input[type="radio"]#nav-guide:checked ~ .view-container #guideView,
+.popup-container input[type="radio"]#nav-controls:checked ~ .view-container #controlsView,
+.popup-container input[type="radio"]#nav-prompts:checked ~ .view-container #promptsView {
+    display: flex !important;
+}
+
+/* ===== HEADER SECTION ===== */
+.header {
+    padding: var(--spacing-10) var(--spacing-6) var(--spacing-6) var(--spacing-6);
+    text-align: center;
+    background: var(--color-white);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-6);
+    flex-shrink: 0;
+}
+
+.logo {
+    width: 80px;
+    height: 80px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    border-radius: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: transparent;
+}
+
+.title-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-1);
+}
+
+.title {
+    font-family: Georgia, serif;
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-bold);
+    color: #8B4513;
+    line-height: var(--line-height-tight);
+}
+
+.subtitle {
+    font-family: var(--font-family-system);
+    font-size: var(--font-size-base);
+    color: #666;
+    font-weight: var(--font-weight-normal);
+    line-height: 1.2;
+}
+
+/* ===== BACK NAVIGATION ===== */
+.back-nav {
+    padding: 0;
+    border-top: var(--border-width-thin) solid #EAEAEA;
+    border-bottom: var(--border-width-thin) solid #EAEAEA;
+    background: var(--color-white);
+    flex-shrink: 0;
+}
+
+.back-link {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    text-decoration: none;
+    color: #333;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: var(--transition-base);
+    min-height: 48px;
+    padding: var(--spacing-4) var(--spacing-6);
+    line-height: 1;
+    width: 100%;
+    border: none;
+    background: var(--color-white);
+    font-family: var(--font-family-system);
+}
+
+.back-link:hover {
+    background: var(--color-gray-50);
+}
+
+.back-arrow {
+    width: var(--spacing-6);
+    height: var(--spacing-6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #666;
+    font-size: 18px;
+    line-height: 1;
+}
+
+/* ===== MAIN CONTENT ===== */
+.content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-8);
+    overflow-y: auto;
+    min-height: 0;
+    max-height: calc(100vh - 200px);
+}
+
+.content > .cta-button {
+    margin: 0 var(--spacing-6);
+}
+
+/* Make sure main view takes full height */
+#mainView {
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* ===== PAGE CONTENT ===== */
+.page-content {
+    flex: 1;
+    padding: var(--spacing-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-5);
+    overflow-y: auto;
+    min-height: 0;
+}
+
+/* ===== SECTIONS ===== */
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-3);
+}
+
+.section-title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+}
+
+.section-icon {
+    font-size: var(--font-size-base);
+}
+
+.section-icon.guide svg { stroke: #00A3E4; }
+.section-icon.controls svg { stroke: #A5662B; }
+.section-icon.saved svg { stroke: #43936D; }
+
+.section-content {
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-normal);
+    color: #666;
+}
+
+/* ===== FOOTER ===== */
+.footer {
+    padding: var(--spacing-3) var(--spacing-6);
+    border-top: var(--border-width-thin) solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--color-gray-50);
+    margin-top: auto;
+    flex-shrink: 0;
+}
+
+.footer-links {
+    display: flex;
+    gap: var(--spacing-4);
+}
+
+.footer-link {
+    color: #999;
+    text-decoration: none;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.footer-link:hover {
+    color: #4A90E2;
+}
+
+.version {
+    color: #999;
+    font-size: 11px;
+    font-weight: var(--font-weight-normal);
+}
+
+/* ===== KEYFRAMES ===== */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.lucide-loader {
+    animation: spin 1s linear infinite;
+}

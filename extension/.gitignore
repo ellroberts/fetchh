@@ -1,0 +1,6 @@
+.DS_Store
+package-lock.json
+node_modules/
+consolidated-work-pre-anchors
+build/.DS_Store
+build/*.zip

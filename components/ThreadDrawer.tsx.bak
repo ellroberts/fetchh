@@ -1,0 +1,717 @@
+// components/ThreadDrawer.tsx
+'use client'
+
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
+import { createSupabaseClient } from '../lib/supabase'
+import { X, Highlighter, ListTodo, Bell } from 'lucide-react'
+import { PinType } from '@/components/projects/PinInsightModal'
+import { SaveHighlightModal } from '@/components/SaveHighlightModal'
+import { AddActionModal } from '@/components/AddActionModal'
+import { AddReminderModal } from '@/components/AddReminderModal'
+import { InsightTag } from '@/lib/project-insight-types'
+import { UserBubble } from '@/components/rag/UserBubble'
+import { CodaBubble } from '@/components/rag/CodaBubble'
+import { TabPill } from '@/components/TabPill'
+import { IconButton } from '@/components/IconButton'
+import { Tooltip } from '@/components/Tooltip'
+import { ProjectInsightCard } from '@/components/projects/ProjectInsightCard'
+import { ActionItemCard, ActionItem } from '@/components/projects/ActionItemCard'
+import { ActionItemDrawer } from '@/components/projects/ActionItemDrawer'
+import { ReminderCard, ReminderItem } from '@/components/projects/ReminderCard'
+import { ReminderDrawer } from '@/components/projects/ReminderDrawer'
+
+interface Message {
+  id?: number
+  role: 'user' | 'assistant'
+  content: string
+  timestamp?: string
+}
+
+interface ThreadDrawerProps {
+  pageTitle: string
+  conversationId: string
+  conversationTitle: string
+  highlightText: string
+  messageIndices?: number[]
+  projectId?: string
+  onClose: () => void
+  onScrolled?: (scrolled: boolean) => void
+}
+
+// ── Extract meaningful search fragments from a chunk ─────────────────────────
+// chunk_text is multiple messages joined with \n\n
+// We split it into lines, filter to ones long enough to be unique, and
+// search each message for any of those fragments.
+function getSearchFragments(chunkText: string): string[] {
+  return chunkText
+    .split(/\n+/)
+    .map(l => l.trim())
+    .map(l => l.replace(/^\[(ASSISTANT|USER)\]:\s*/i, ''))
+    .filter(l => l.length >= 20)
+    .slice(0, 5)
+    .map(l => l.toLowerCase())
+}
+
+// ── Find the best matching message index ─────────────────────────────────────
+function findHighlightedIndex(messages: Message[], chunkText: string): number {
+  if (!chunkText || chunkText.length < 10) return -1
+
+  const fragments = getSearchFragments(chunkText)
+  if (fragments.length === 0) return -1
+
+  // Find first message that contains any fragment
+  for (const fragment of fragments) {
+    const idx = messages.findIndex(m =>
+      m.content.toLowerCase().includes(fragment)
+    )
+    if (idx !== -1) return idx
+  }
+
+  return -1
+}
+
+// ── Highlight matching text within a message ─────────────────────────────────
+function HighlightedContent({ content, highlight }: { content: string; highlight: string }) {
+  if (!highlight || highlight.length < 10) {
+    return (
+      <>
+        {content.split('\n').map((line, i) => (
+          <p key={i} className="mb-2 last:mb-0">{line}</p>
+        ))}
+      </>
+    )
+  }
+
+  // Find the fragment from the chunk that actually appears in this message
+  const fragments = getSearchFragments(highlight)
+  let matchIndex = -1
+  let matchLength = 0
+  const lowerContent = content.toLowerCase()
+
+  for (const fragment of fragments) {
+    const idx = lowerContent.indexOf(fragment)
+    if (idx !== -1) {
+      matchIndex = idx
+      matchLength = fragment.length
+      break
+    }
+  }
+
+  if (matchIndex === -1) {
+    return (
+      <>
+        {content.split('\n').map((line, i) => (
+          <p key={i} className="mb-2 last:mb-0">{line}</p>
+        ))}
+      </>
+    )
+  }
+
+  const before = content.slice(0, matchIndex)
+  const matched = content.slice(matchIndex, matchIndex + matchLength)
+  const after = content.slice(matchIndex + matchLength)
+
+  return (
+    <>
+      {before && before.split('\n').map((line, i) => (
+        <p key={`b${i}`} className="mb-2 last:mb-0">{line}</p>
+      ))}
+      <mark className="bg-amber-200 dark:bg-amber-700 text-amber-900 dark:text-amber-100 rounded px-0.5">
+        {matched}
+      </mark>
+      {after && after.split('\n').map((line, i) => (
+        <p key={`a${i}`} className="mb-2 last:mb-0">{line}</p>
+      ))}
+    </>
+  )
+}
+
+// ── Resolve which message index to anchor to ──────────────────────────────────
+// Prefers the exact message_indices from the RAG chunk metadata; falls back to
+// fuzzy text matching when those are unavailable.
+function resolveHighlightedIndex(
+  messages: Message[],
+  messageIndices: number[] | undefined,
+  chunkText: string,
+): number {
+  // Use the first message index from the chunk metadata if it's in range
+  if (messageIndices && messageIndices.length > 0) {
+    const idx = messageIndices[0]
+    if (idx >= 0 && idx < messages.length) return idx
+  }
+  // Fallback: fuzzy text matching
+  return findHighlightedIndex(messages, chunkText)
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+function MultiHighlightText({ text, termGroups }: { text: string; termGroups: { terms: string[]; color: string }[] }) {
+  // Build a map of index -> color for all matches
+  const segments: { start: number; end: number; color: string }[] = []
+  for (const { terms, color } of termGroups) {
+    for (const term of terms) {
+      if (!term) continue
+      let idx = 0
+      while ((idx = text.indexOf(term, idx)) !== -1) {
+        segments.push({ start: idx, end: idx + term.length, color })
+        idx += term.length
+      }
+    }
+  }
+  if (!segments.length) return <>{text}</>
+  segments.sort((a, b) => a.start - b.start)
+  const result: React.ReactNode[] = []
+  let cursor = 0
+  for (const seg of segments) {
+    if (seg.start < cursor) continue
+    if (seg.start > cursor) result.push(text.slice(cursor, seg.start))
+    result.push(<mark key={seg.start} style={{ background: seg.color, borderRadius: 2, padding: '0 1px' }}>{text.slice(seg.start, seg.end)}</mark>)
+    cursor = seg.end
+  }
+  if (cursor < text.length) result.push(text.slice(cursor))
+  return <>{result}</>
+}
+
+function TabEmptyState({ emoji, title, subtitle }: { emoji: string; title: string; subtitle: string }) {
+  return (
+    <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+      <div style={{
+        width: 48, height: 48,
+        borderRadius: 'var(--border-radius-base)',
+        backgroundColor: 'var(--color-primary-light)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        margin: '0 auto 16px',
+        fontSize: 24,
+      }}>
+        {emoji}
+      </div>
+      <h3 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-title)', marginBottom: '6px' }}>{title}</h3>
+      <p style={{ color: 'var(--color-text-muted)', maxWidth: '320px', margin: '0 auto', fontSize: 'var(--font-size-sm)' }}>{subtitle}</p>
+    </div>
+  )
+}
+
+
+// Renders text with any saved highlight terms wrapped in <mark>
+function HighlightedText({ text, terms, color = "var(--color-amber-200)" }: { text: string; terms: string[]; color?: string }) {
+  if (!terms.length) return <>{text}</>
+  // Find the first matching term
+  for (const term of terms) {
+    if (!term || !text.includes(term)) continue
+    const idx = text.indexOf(term)
+    return (
+      <>
+        {text.slice(0, idx)}
+        <mark style={{ background: color, borderRadius: 2, padding: '0 1px' }}>
+          {text.slice(idx, idx + term.length)}
+        </mark>
+        <HighlightedText text={text.slice(idx + term.length)} terms={terms} color={color} />
+      </>
+    )
+  }
+  return <>{text}</>
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+export function ThreadDrawer({ pageTitle, conversationId, conversationTitle, highlightText, messageIndices, projectId, onClose, onScrolled }: ThreadDrawerProps) {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [loading, setLoading] = useState(true)
+  const highlightRef = useRef<HTMLDivElement>(null)
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'messages' | 'highlights' | 'actions' | 'reminders'>('messages')
+
+  // Tab data
+  const [insights, setInsights] = useState<any[]>([])
+  const [actionItems, setActionItems] = useState<ActionItem[]>([])
+  const [reminders, setReminders] = useState<ReminderItem[]>([])
+  const [tabLoading, setTabLoading] = useState(false)
+  const [highlights, setHighlights] = useState<any[]>([])
+
+  // Drawer state for actions/reminders
+  const [selectedAction, setSelectedAction] = useState<ActionItem | null>(null)
+  const [selectedReminder, setSelectedReminder] = useState<ReminderItem | null>(null)
+
+  // Scroll shadow state — drives the tab bar shadow
+  const [scrolled, setScrolled] = useState(false)
+  const handleTabContentScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    setScrolled(e.currentTarget.scrollTop > 0)
+  }
+
+  // Pin insight state
+  const [selectionMenu, setSelectionMenu] = useState<{ x: number; y: number; text: string } | null>(null)
+  const [pendingPin, setPendingPin] = useState<string | null>(null)
+  const [pendingPinType, setPendingPinType] = useState<'insight' | 'reminder' | 'action'>('insight')
+  const [pinSaved, setPinSaved] = useState(false)
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([])
+
+  const handleMouseUp = useCallback(() => {
+    setTimeout(() => {
+      const selection = window.getSelection()
+      const text = selection?.toString().trim()
+      if (!text || text.length < 10) { setSelectionMenu(null); return }
+      const range = selection?.getRangeAt(0)
+      const container = scrollContainerRef.current
+      if (!container || !range) return
+      if (!container.contains(range.commonAncestorContainer)) { setSelectionMenu(null); return }
+      const rect = range.getBoundingClientRect()
+      setSelectionMenu({ x: rect.left + rect.width / 2, y: rect.top, text })
+    }, 10)
+  }, [])
+
+  useEffect(() => {
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => document.removeEventListener('mouseup', handleMouseUp)
+  }, [handleMouseUp])
+
+  useEffect(() => {
+    const dismiss = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.closest('[data-selection-menu]')) return
+      setSelectionMenu(null)
+    }
+    document.addEventListener('click', dismiss)
+    return () => document.removeEventListener('click', dismiss)
+  }, [])
+
+  const handlePinSave = async (type: PinType, tag: InsightTag | null, note?: string, chosenProjectId?: string, customTitle?: string) => {
+    if (!pendingPin) return
+    const targetProjectId = chosenProjectId || projectId || null
+    const userId = (await supabase.auth.getUser()).data.user?.id
+    if (type === 'insight') {
+      const { error } = await supabase.from('highlights').insert({
+        user_id: userId,
+        conversation_id: conversationId,
+        highlighted_text: pendingPin,
+        source_url: window.location.href,
+        source_title: conversationTitle,
+        source_platform: 'app',
+        is_archived: false,
+        notes: note || null,
+      })
+      if (error) { console.error('Error saving highlight:', error); throw error }
+      window.dispatchEvent(new Event('threadcub:insight-saved'))
+    } else {
+      const words = pendingPin.trim().split(/\s+/)
+      const title = customTitle || (words.length <= 10 ? words.join(' ') : words.slice(0, 10).join(' ') + '...')
+      const table = type === 'reminder' ? 'reminder_items' : 'action_items'
+      const { error } = await supabase.from(table).insert({
+        user_id: userId,
+        project_id: targetProjectId,
+        title,
+        detail: note || '',
+        source_chunk: pendingPin,
+        source_conversation_ids: [conversationId],
+        status: 'open',
+        completed_at: null,
+      })
+      if (error) { console.error(`Error saving ${type}:`, error); throw error }
+      const eventName = type === 'reminder' ? 'threadcub:reminder-item-added' : 'threadcub:action-item-added'
+      window.dispatchEvent(new CustomEvent(eventName, { detail: { projectId: targetProjectId } }))
+    }
+    setPendingPin(null)
+    setPinSaved(true)
+    fetchTabData()
+    setTimeout(() => setPinSaved(false), 2500)
+  }
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const supabase = createSupabaseClient()
+
+  // Load messages
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      try {
+        const { data } = await supabase
+          .from('conversations')
+          .select('content, messages')
+          .eq('id', conversationId)
+          .single()
+
+        if (data?.content?.messages) setMessages(data.content.messages)
+        else if (data?.messages) setMessages(data.messages)
+      } catch (err) {
+        console.error('ThreadDrawer: failed to load messages', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [conversationId])
+
+  // Fetch projects for action/reminder modal picker
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('projects').select('id, name').order('name')
+      if (data) setProjects(data)
+    }
+    load()
+  }, [])
+
+  // Load insights, actions, reminders for this conversation
+  const fetchTabData = useCallback(async () => {
+    setTabLoading(true)
+    try {
+      const [insightsRes, actionsRes, remindersRes, highlightsRes] = await Promise.all([
+        supabase
+          .from('project_insights')
+          .select('*')
+          .contains('source_conversation_ids', [conversationId])
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('action_items')
+          .select('*')
+          .contains('source_conversation_ids', [conversationId])
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('reminder_items')
+          .select('*')
+          .contains('source_conversation_ids', [conversationId])
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('highlights')
+          .select('*')
+          .eq('conversation_id', conversationId)
+          .eq('is_archived', false)
+          .order('created_at', { ascending: false }),
+      ])
+      if (insightsRes.data) setInsights(insightsRes.data)
+      if (highlightsRes.data) setHighlights(highlightsRes.data)
+      if (actionsRes.data) setActionItems(actionsRes.data as ActionItem[])
+      if (remindersRes.data) setReminders(remindersRes.data as ReminderItem[])
+    } catch (err) {
+      console.error('ThreadDrawer: failed to load tab data', err)
+    } finally {
+      setTabLoading(false)
+    }
+  }, [conversationId])
+
+  useEffect(() => {
+    fetchTabData()
+  }, [fetchTabData])
+
+  // Toggle action status
+  const handleToggleActionStatus = async (id: string, status: 'open' | 'done') => {
+    await supabase.from('action_items').update({ status, completed_at: status === 'done' ? new Date().toISOString() : null }).eq('id', id)
+    setActionItems(prev => prev.map(a => a.id === id ? { ...a, status, completed_at: status === 'done' ? new Date().toISOString() : null } : a))
+    if (selectedAction?.id === id) setSelectedAction(prev => prev ? { ...prev, status, completed_at: status === 'done' ? new Date().toISOString() : null } : null)
+  }
+
+  // Toggle reminder status
+  const handleToggleReminderStatus = async (id: string, status: 'open' | 'done') => {
+    await supabase.from('reminder_items').update({ status, completed_at: status === 'done' ? new Date().toISOString() : null }).eq('id', id)
+    setReminders(prev => prev.map(r => r.id === id ? { ...r, status, completed_at: status === 'done' ? new Date().toISOString() : null } : r))
+    if (selectedReminder?.id === id) setSelectedReminder(prev => prev ? { ...prev, status, completed_at: status === 'done' ? new Date().toISOString() : null } : null)
+  }
+
+  // Scroll to highlighted message after load
+  useEffect(() => {
+    if (!loading && highlightRef.current) {
+      setTimeout(() => {
+        highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 300)
+    }
+  }, [loading])
+
+  const highlightedIndex = resolveHighlightedIndex(messages, messageIndices, highlightText)
+
+  const formatTime = (ts?: string) => {
+    if (!ts) return ''
+    return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  const thisConversation = [{ id: conversationId, title: conversationTitle }]
+
+  return (
+    <div className="flex flex-col h-full" style={{ backgroundColor: 'var(--color-surface)' }}>
+
+      {/* Pin portal */}
+      {selectionMenu && typeof document !== 'undefined' && createPortal(
+        <div
+          data-selection-menu
+          onMouseDown={e => e.stopPropagation()}
+          style={{ position: 'fixed', left: selectionMenu.x, top: selectionMenu.y, transform: 'translate(-50%, -100%) translateY(-8px)', zIndex: 9999, backgroundColor: 'var(--color-surface-raised)', border: '1px solid var(--color-border-default)', borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.10)', padding: '6px', display: 'flex', gap: '2px' }}
+        >
+          {([
+            { type: 'insight' as const,  Icon: Highlighter, title: 'Save highlight' },
+            { type: 'action'  as const,  Icon: ListTodo,    title: 'Add action'     },
+            { type: 'reminder' as const, Icon: Bell,        title: 'Add reminder'   },
+          ] as const).map(({ type, Icon, title }) => (
+            <button
+              key={type}
+              title={title}
+              onMouseDown={e => { e.preventDefault(); setPendingPin(selectionMenu.text); setPendingPinType(type); setSelectionMenu(null); window.getSelection()?.removeAllRanges() }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: '7px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', transition: 'background 0.15s' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-primary-light)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+            >
+              <Icon size={17} />
+            </button>
+          ))}
+        </div>,
+        document.body
+      )}
+      {pinSaved && typeof document !== 'undefined' && createPortal(
+        <div style={{ position: 'fixed', bottom: 24, right: 24, backgroundColor: 'var(--color-surface-raised)', border: '1px solid var(--color-border-default)', borderRadius: 'var(--border-radius-lg)', padding: '12px 16px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-body)', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 400, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>📌</span> Pinned to project
+        </div>,
+        document.body
+      )}
+      {pendingPin && pendingPinType === 'insight' && (
+        <SaveHighlightModal
+          content={pendingPin}
+          onCancel={() => setPendingPin(null)}
+          onSave={async (note) => { await handlePinSave('insight', null, note, projectId) }}
+        />
+      )}
+      {pendingPin && pendingPinType === 'action' && (
+        <AddActionModal
+          content={pendingPin}
+          projects={projects}
+          defaultProjectId={projectId}
+          onCancel={() => setPendingPin(null)}
+          onSave={async (title, detail, pid) => { await handlePinSave('action', null, detail, pid, title) }}
+        />
+      )}
+      {pendingPin && pendingPinType === 'reminder' && (
+        <AddReminderModal
+          content={pendingPin}
+          projects={projects}
+          defaultProjectId={projectId}
+          onCancel={() => setPendingPin(null)}
+          onSave={async (title, detail, pid) => { await handlePinSave('reminder', null, detail, pid, title) }}
+        />
+      )}
+
+      {/* Unified sticky header — title + close + tabs all in one container so the shadow sits below the tabs */}
+      <div className="px-8" style={{
+        paddingTop: '32px',
+        flexShrink: 0,
+        position: 'relative',
+        zIndex: 1,
+        backgroundColor: 'var(--color-surface)',
+        boxShadow: scrolled ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+        transition: 'box-shadow 200ms ease',
+      }}>
+        {/* Title row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '48px', marginBottom: '8px' }}>
+          <div style={{ flex: 1 }}>
+            <h1 style={{
+              fontSize: 'var(--font-size-3xl)',
+              fontWeight: '600',
+              color: 'var(--color-text-title)',
+              fontFamily: 'var(--font-family-primary)',
+              margin: 0,
+              lineHeight: '1.2',
+            }}>
+              {pageTitle}
+            </h1>
+            <p style={{
+              margin: 0,
+              color: 'var(--color-text-secondary)',
+              fontSize: 'var(--font-size-lg)',
+              fontFamily: 'var(--font-family-primary)',
+              lineHeight: '20px',
+            }}>
+              {conversationTitle}
+            </p>
+          </div>
+          <Tooltip label="Close" position="top">
+            <IconButton onClick={onClose} variant="ghost" size="lg">
+              <X size={16} />
+            </IconButton>
+          </Tooltip>
+        </div>
+        {/* Tabs — inside the header so shadow falls below them */}
+        <div style={{ display: 'flex', gap: '8px', paddingBottom: '12px' }}>
+          <TabPill
+            label={`Messages (${messages.length})`}
+            selected={activeTab === 'messages'}
+            onClick={() => { setActiveTab('messages'); setScrolled(false) }}
+          />
+          <TabPill
+            label={`Highlights (${highlights.length})`}
+            selected={activeTab === 'highlights'}
+            onClick={() => { setActiveTab('highlights'); setScrolled(false) }}
+          />
+          <TabPill
+            label={`Actions (${actionItems.length})`}
+            selected={activeTab === 'actions'}
+            onClick={() => { setActiveTab('actions'); setScrolled(false) }}
+          />
+          <TabPill
+            label={`Reminders (${reminders.length})`}
+            selected={activeTab === 'reminders'}
+            onClick={() => { setActiveTab('reminders'); setScrolled(false) }}
+          />
+        </div>
+      </div>
+
+      {/* Messages tab */}
+      {activeTab === 'messages' && (
+        <div ref={scrollContainerRef} onScroll={handleTabContentScroll} className="flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--color-surface-raised)', padding: '12px 0 32px' }}>
+          {loading ? (
+            <div className="flex items-center justify-center h-40">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600" />
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="text-center text-muted-foreground/70 text-sm py-12">No messages found</div>
+          ) : (
+            <div>
+              {messages.map((msg, index) => {
+                const isHighlighted = index === highlightedIndex
+                return (
+                  <div
+                    key={msg.id || index}
+                    ref={isHighlighted ? highlightRef : undefined}
+                    style={{
+                      padding: '6px 24px',
+                      paddingTop: '6px',
+                      paddingBottom: index === messages.length - 1 ? '48px' : '6px',
+                      outline: isHighlighted ? '2px solid var(--color-warning-300)' : 'none',
+                      outlineOffset: '-2px',
+                    }}
+                  >
+                    {(() => {
+                      const highlightTerms = highlights.map(h => h.highlighted_text).filter(Boolean)
+                      const actionTerms = actionItems.map(a => a.source_chunk).filter(Boolean)
+                      const reminderTerms = reminders.map(r => r.source_chunk).filter(Boolean)
+                      const allTerms = [...highlightTerms, ...actionTerms, ...reminderTerms]
+                      const hasMatch = allTerms.some(t => msg.content.includes(t))
+                      if (!hasMatch) {
+                        return msg.role === 'user'
+                          ? <UserBubble content={msg.content} timestamp={msg.timestamp} />
+                          : <CodaBubble content={msg.content} timestamp={msg.timestamp} msgIndex={index} />
+                      }
+                      return (
+                        <div style={{
+                          backgroundColor: msg.role === 'user' ? 'var(--color-surface-primary-subtle)' : 'var(--color-surface-raised)',
+                          color: 'var(--color-text-body)',
+                          borderRadius: 'var(--border-radius-lg)',
+                          padding: '8px 16px',
+                          fontSize: 'var(--font-size-sm)',
+                          lineHeight: 1.6,
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                        }}>
+                          <MultiHighlightText text={msg.content} termGroups={[
+                            { terms: highlightTerms, color: 'var(--color-amber-200)' },
+                            { terms: actionTerms, color: 'var(--color-teal-200)' },
+                            { terms: reminderTerms, color: 'var(--color-coral-200)' },
+                          ]} />
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Highlights tab */}
+      {activeTab === 'highlights' && (
+        <div className="flex-1 overflow-y-auto" onScroll={handleTabContentScroll} style={{ padding: '12px 24px 48px' }}>
+          {tabLoading ? (
+            <div className="flex items-center justify-center h-40">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderColor: 'var(--color-primary-500)' }} />
+            </div>
+          ) : highlights.length === 0 ? (
+            <TabEmptyState
+              emoji="✨"
+              title="No highlights yet"
+              subtitle="Select any text in the Messages tab to save a highlight."
+            />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {highlights.map(h => (
+                <div key={h.id} style={{ background: 'var(--color-surface-raised)', border: '1px solid var(--color-border-default)', borderRadius: 'var(--border-radius-base)', padding: '12px 14px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                  <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-body)', lineHeight: 1.6, margin: 0, flex: 1 }}>{h.highlighted_text}</p>
+                  <button
+                    onClick={async () => { await supabase.from('highlights').update({ is_archived: true }).eq('id', h.id); setHighlights(prev => prev.filter(x => x.id !== h.id)) }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: '2px 4px', borderRadius: 4, flexShrink: 0 }}
+                  >✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Actions tab */}
+      {activeTab === 'actions' && (
+        <div className="flex-1 overflow-y-auto" onScroll={handleTabContentScroll} style={{ padding: '12px 24px 48px' }}>
+          {tabLoading ? (
+            <div className="flex items-center justify-center h-40">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderColor: 'var(--color-primary-500)' }} />
+            </div>
+          ) : selectedAction ? (
+            <ActionItemDrawer
+              item={selectedAction}
+              conversations={thisConversation}
+              onClose={() => setSelectedAction(null)}
+              onToggleStatus={handleToggleActionStatus}
+            />
+          ) : actionItems.length === 0 ? (
+            <TabEmptyState
+              emoji="✅"
+              title="No actions detected"
+              subtitle="Action items are detected automatically when you chat in the RAG panel."
+            />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {actionItems.map(item => (
+                <ActionItemCard
+                  key={item.id}
+                  item={item}
+                  conversations={thisConversation}
+                  onToggleStatus={handleToggleActionStatus}
+                  onOpen={setSelectedAction}
+                  viewMode="list"
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Reminders tab */}
+      {activeTab === 'reminders' && (
+        <div className="flex-1 overflow-y-auto" onScroll={handleTabContentScroll} style={{ padding: '12px 24px 48px' }}>
+          {tabLoading ? (
+            <div className="flex items-center justify-center h-40">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderColor: 'var(--color-primary-500)' }} />
+            </div>
+          ) : selectedReminder ? (
+            <ReminderDrawer
+              item={selectedReminder}
+              conversations={thisConversation}
+              onClose={() => setSelectedReminder(null)}
+              onToggleStatus={handleToggleReminderStatus}
+            />
+          ) : reminders.length === 0 ? (
+            <TabEmptyState
+              emoji="🔔"
+              title="No reminders detected"
+              subtitle="Reminder items are detected automatically when you chat in the RAG panel."
+            />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {reminders.map(item => (
+                <ReminderCard
+                  key={item.id}
+                  item={item}
+                  conversations={thisConversation}
+                  onToggleStatus={handleToggleReminderStatus}
+                  onOpen={setSelectedReminder}
+                  viewMode="list"
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}

@@ -1,0 +1,34 @@
+{
+  "title": "Page Unresponsive Troubleshooting",
+  "summary": "Session with 0 direction changes, 0 issues encountered, 2 files modified",
+  "outcome": {
+    "status": "completed",
+    "reason": "Session completed",
+    "satisfaction": "resolved"
+  },
+  "extractedData": {
+    "keyDecisions": [],
+    "filesModified": [
+      {
+        "file": "popup.js",
+        "purpose": "Added new functionality",
+        "timestamp": "2025-06-24T16:26:10.606Z"
+      },
+      {
+        "file": "content.js",
+        "purpose": "Added new functionality",
+        "timestamp": "2025-06-24T16:26:10.606Z"
+      }
+    ],
+    "problems": [],
+    "solutions": [],
+    "codeChanges": []
+  },
+  "stats": {
+    "totalMessages": 4,
+    "directionChanges": 0,
+    "problemsEncountered": 0,
+    "filesModified": 2,
+    "solutionsProvided": 0
+  }
+}

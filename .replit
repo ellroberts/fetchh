@@ -1,0 +1,49 @@
+modules = ["nodejs-20", "web", "python-3.12", "postgresql-16"]
+[agent]
+expertMode = true
+integrations = ["notion:1.0.0"]
+
+[nix]
+channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+NEXT_PUBLIC_SUPABASE_URL = "https://evbkoulaaityzztyutox.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2YmtvdWxhYWl0eXp6dHl1dG94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2MTEwMDUsImV4cCI6MjA2ODE4NzAwNX0.OP6_JmlZwxo9p2ZpWSQMdE-wGVSqowB9kkT08A0c92Q"
+RESEND_FROM_EMAIL = "hello@threadcub.com"
+NEXT_PUBLIC_EXTENSION_ID = "bpkdfemmpialikdpnfmpfnmkggicnajn"
+RESEND_API_KEY = "re_4ANKVUYA_3hEWdPZsa3bMrJp2S8WmR6H5"
+SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2YmtvdWxhYWl0eXp6dHl1dG94Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjYxMTAwNSwiZXhwIjoyMDY4MTg3MDA1fQ.rWTUp5ykktj5K2V-BIeDTgo8UUdBsoYehhZ8GpLjMdY"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 120000

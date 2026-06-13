@@ -1,0 +1,526 @@
+/* =============================================================================
+   ThreadCub Floating Button Styles
+   ============================================================================= */
+
+#threadcub-edge-btn {
+  position: fixed;
+  width: var(--floating-button-size);
+  height: var(--floating-button-size);
+  background: var(--color-floating-btn-bg);
+  border: var(--border-width-btn) solid var(--color-floating-btn-border);
+  border-radius: var(--border-radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 999999;
+  transition: all var(--transition-base); /* Base transition for general changes */
+  user-select: none;
+  color: var(--color-floating-btn-text);
+  filter: drop-shadow(var(--shadow-floating-btn-default)); /* Using filter for drop-shadow */
+  backdrop-filter: blur(10px); /* Fixed value, consider making a token if varies */
+  font-family: var(--font-family-system); /* Apply system font family */
+}
+
+#threadcub-edge-btn:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(var(--shadow-floating-btn-hover));
+  background: var(--color-floating-btn-hover-bg);
+  /*border-color: var(--color-floating-btn-hover-border);*/
+}
+
+#threadcub-edge-btn.dragging {
+  transform: scale(1.1);
+  filter: drop-shadow(var(--shadow-floating-btn-dragging));
+  cursor: grabbing;
+  transition: none; /* Override transitions during drag */
+}
+
+/* Bear Face & Content */
+.threadcub-btn-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.threadcub-bear-face {
+  font-size: var(--font-size-floating-btn-bear-face);
+  transition: all var(--transition-base);
+  user-select: none;
+  cursor: grab;
+  display: flex; /* To center image/emoji */
+  align-items: center;
+  justify-content: center;
+}
+
+.threadcub-bear-face img {
+  width: 100%; /* Make image fill its parent container */
+  height: 100%;
+  object-fit: contain; /* Ensures image scales down to fit while maintaining aspect ratio */
+  transition: all var(--transition-base);
+  display: block;
+  padding: var(--spacing-1); /* ADD THIS LINE: Adds a consistent 4px padding around the image */
+  box-sizing: border-box; /* ADD THIS LINE: Ensures padding is included in the width/height */
+}
+
+.threadcub-bear-face .bear-emoji {
+  font-size: var(--font-size-floating-btn-bear-face);
+  display: none; /* Hidden by default, shown by JS on error */
+}
+
+.threadcub-bear-face:active {
+  cursor: grabbing;
+}
+
+/* Action Buttons Container */
+.threadcub-action-buttons {
+  position: absolute;
+  display: flex;
+  gap: var(--spacing-gap-xs);
+  opacity: 0;
+  transition: all var(--transition-action-buttons);
+  pointer-events: none; /* Hidden by default */
+  flex-direction: column; /* Default vertical layout */
+}
+
+/* FINAL VERSION - Remove diagnostic and restore proper behavior */
+.threadcub-grip-icon {
+  position: absolute;
+  opacity: 0; /* Hidden by default, shown on hover */
+  transition: all var(--transition-action-buttons);
+  color: var(--color-floating-btn-grip-icon);
+  pointer-events: none;
+  transform: scale(0.8); /* Smaller when hidden */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+/* Show gripper on hover - NO conflicting transforms */
+#threadcub-edge-btn:hover .threadcub-grip-icon {
+  opacity: 1;
+}
+
+.threadcub-grip-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Show gripper on hover - REMOVED conflicting transform rule */
+#threadcub-edge-btn:hover .threadcub-grip-icon {
+  opacity: 1;
+  /* NO transform here - let edge-specific rules handle positioning */
+}
+
+/* Show gripper when dragging (centered) */
+#threadcub-edge-btn.dragging .threadcub-grip-icon {
+  opacity: 1 !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) scale(1) !important;
+}
+
+/* CORRECTED POSITIONING - FIXED VERSION: 
+   Button: 60px diameter, Bear: 48px (centered), Padding: 6px on each side
+   Gripper: 16px, needs 4px clearance from bear's edge, 8px from button edge
+   
+   Calculation:
+   - Button radius: 30px
+   - Bear radius: 24px  
+   - Space from center to bear edge: 24px
+   - Space from bear edge to gripper center: 4px + 8px = 12px
+   - Total distance from button center: 24px + 12px = 36px
+   - But we want INNER placement, so: 30px - 14px = 16px from center
+*/
+
+/* FINE-TUNED POSITIONING - Match exact diagram requirements */
+
+/* LEFT edge of screen = gripper goes on LEFT side of button */
+#threadcub-edge-btn.edge-left .threadcub-grip-icon {
+  left: -16px !important; /* Further out toward browser edge */
+  right: auto !important;
+  top: 50% !important;
+  bottom: auto !important;
+  transform: translateY(-50%) rotate(0deg) scale(0.8) !important;
+}
+
+#threadcub-edge-btn.edge-left:hover .threadcub-grip-icon {
+  left: -18px !important;
+  right: auto !important;
+  top: 50% !important;
+  bottom: auto !important;
+  transform: translateY(-50%) rotate(0deg) scale(1) !important;
+}
+
+/* RIGHT edge of screen = gripper goes on RIGHT side of button */
+#threadcub-edge-btn.edge-right .threadcub-grip-icon {
+  right: -18px !important; /* Further out toward browser edge */
+  left: auto !important;
+  top: 50% !important;
+  bottom: auto !important;
+  transform: translateY(-50%) rotate(0deg) scale(0.8) !important;
+}
+
+#threadcub-edge-btn.edge-right:hover .threadcub-grip-icon {
+  right: -18px !important;
+  left: auto !important;
+  top: 50% !important;
+  bottom: auto !important;
+  transform: translateY(-50%) rotate(0deg) scale(1) !important;
+}
+
+/* TOP edge of screen = gripper goes on TOP side of button */
+#threadcub-edge-btn.edge-top .threadcub-grip-icon {
+  left: 50% !important;
+  right: auto !important;
+  top: -18px !important; /* Further out toward browser edge */
+  bottom: auto !important;
+  transform: translateX(-50%) rotate(90deg) scale(0.8) !important;
+}
+
+#threadcub-edge-btn.edge-top:hover .threadcub-grip-icon {
+  left: 50% !important;
+  right: auto !important;
+  top: -18px !important;
+  bottom: auto !important;
+  transform: translateX(-50%) rotate(90deg) scale(1) !important;
+}
+
+/* BOTTOM edge of screen = gripper goes on BOTTOM side of button */
+#threadcub-edge-btn.edge-bottom .threadcub-grip-icon {
+  left: 50% !important;
+  right: auto !important;
+  bottom: -18px !important; /* Further out toward browser edge */
+  top: auto !important;
+  transform: translateX(-50%) rotate(90deg) scale(0.8) !important;
+}
+
+#threadcub-edge-btn.edge-bottom:hover .threadcub-grip-icon {
+  left: 50% !important;
+  right: auto !important;
+  bottom: -18px !important;
+  top: auto !important;
+  transform: translateX(-50%) rotate(90deg) scale(1) !important;
+}
+
+/* Shadow Button (for drag preview) */
+.threadcub-shadow-button {
+  position: fixed;
+  width: var(--shadow-button-size);
+  height: var(--shadow-button-size);
+  background: var(--color-shadow-btn-bg);
+  border: var(--border-width-btn) dashed var(--color-shadow-btn-border); /* Dashed border from original */
+  border-radius: var(--border-radius-full);
+  pointer-events: none;
+  z-index: 999997;
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.threadcub-shadow-button.active {
+  opacity: 1;
+}
+
+/* Individual Action Buttons */
+.threadcub-new-btn,
+.threadcub-save-btn,
+.threadcub-download-btn,
+.threadcub-tag-btn,
+.threadcub-close-btn {
+  width: var(--action-button-size) !important;
+  height: var(--action-button-size) !important;
+  border-radius: var(--border-radius-full) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all var(--transition-action-buttons) !important;
+  cursor: pointer !important;
+  backdrop-filter: blur(10px) !important; /* Fixed value */
+  box-shadow: var(--shadow-action-btn-default) !important;
+  transform: scale(0.7); /* Smaller when hidden - no !important allows hover override */
+  pointer-events: auto !important; /* Allow clicks when visible */
+  background: var(--color-action-btn-bg) !important;
+  color: var(--color-action-btn-text) !important;
+}
+
+.threadcub-new-btn svg,
+.threadcub-save-btn svg,
+.threadcub-download-btn svg,
+.threadcub-tag-btn svg,
+.threadcub-close-btn svg {
+  width: var(--icon-size-action-btn) !important;
+  height: var(--icon-size-action-btn) !important;
+  stroke: currentColor !important;
+  fill: none !important;
+}
+
+/* Action Button Hover States */
+.threadcub-new-btn:hover {
+  background: var(--color-action-btn-new-bg-hover) !important;
+  color: var(--color-action-btn-new-text-hover) !important;
+  transform: scale(1.1) !important;
+  box-shadow: var(--shadow-action-btn-new-hover) !important;
+}
+
+.threadcub-save-btn:hover {
+  background: var(--color-action-btn-save-bg-hover) !important;
+  color: var(--color-action-btn-save-text-hover) !important;
+  transform: scale(1.1) !important;
+  box-shadow: var(--shadow-action-btn-save-hover) !important;
+}
+
+@keyframes threadcub-spin {
+  to { transform: rotate(360deg); }
+}
+.threadcub-save-btn.saving {
+  background: var(--color-accent-green) !important;
+  color: white !important;
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+}
+.threadcub-save-btn.saving svg {
+  animation: threadcub-spin 0.8s linear infinite !important;
+  stroke: white !important;
+}
+
+.threadcub-download-btn:hover {
+  background: var(--color-action-btn-download-bg-hover) !important;
+  color: var(--color-action-btn-download-text-hover) !important;
+  transform: scale(1.1) !important;
+  box-shadow: var(--shadow-action-btn-download-hover) !important;
+}
+
+.threadcub-tag-btn:hover {
+  background: var(--color-action-btn-tag-bg-hover) !important;
+  color: var(--color-action-btn-tag-text-hover) !important;
+  transform: scale(1.1) !important;
+  box-shadow: var(--shadow-action-btn-tag-hover) !important;
+}
+
+.threadcub-close-btn:hover {
+  background: var(--color-action-btn-close-bg-hover) !important;
+  color: var(--color-action-btn-close-text-hover) !important;
+  transform: scale(1.1) !important;
+  box-shadow: var(--shadow-action-btn-close-hover) !important;
+}
+
+/* Ensure white icons on hover for new-btn, save-btn, and close-btn (Grok fix) */
+.threadcub-new-btn:hover svg,
+.threadcub-save-btn:hover svg,
+.threadcub-close-btn:hover svg {
+  stroke: white !important;
+}
+
+/* ===== Download Format Flyout Menu ===== */
+.threadcub-download-flyout {
+  position: fixed;
+  background: white;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 8px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  padding: 4px;
+  z-index: 10000001;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  display: flex;
+  gap: 4px;
+  font-family: var(--font-family-system);
+}
+
+.threadcub-download-flyout.show {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.threadcub-flyout-option {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--color-action-btn-text);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.threadcub-flyout-option:hover {
+  background: var(--color-action-btn-download-bg-hover);
+  color: var(--color-action-btn-download-text-hover);
+}
+
+/* Layout for Action Buttons based on edge */
+#threadcub-edge-btn.edge-right .threadcub-action-buttons,
+#threadcub-edge-btn.edge-left .threadcub-action-buttons {
+  top: 70px; /* Offset from center of button */
+  left: 50%;
+  transform: translateX(-50%); /* Center horizontally */
+  flex-direction: column; /* Vertical stack */
+}
+
+#threadcub-edge-btn.edge-top .threadcub-action-buttons {
+  top: 70px; /* Offset from center of button */
+  left: 50%;
+  transform: translateX(-50%); /* Center horizontally */
+  flex-direction: column; /* Vertical stack */
+}
+
+#threadcub-edge-btn.edge-bottom .threadcub-action-buttons {
+  bottom: 70px; /* Offset from center of button */
+  left: 50%;
+  transform: translateX(-50%); /* Center horizontally */
+  flex-direction: column; /* Vertical stack */
+}
+
+/* Visibility on hover */
+#threadcub-edge-btn:hover .threadcub-action-buttons,
+#threadcub-edge-btn .threadcub-action-buttons:hover { /* Allow hover on buttons themselves to keep visible */
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Keep action buttons visible when download flyout is active */
+#threadcub-edge-btn.flyout-active {
+  transform: scale(1.05);
+  filter: drop-shadow(var(--shadow-floating-btn-hover));
+  background: var(--color-floating-btn-hover-bg);
+}
+
+#threadcub-edge-btn.flyout-active .threadcub-action-buttons {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Scale effect for action buttons on hover of main button */
+#threadcub-edge-btn:hover .threadcub-new-btn,
+#threadcub-edge-btn:hover .threadcub-save-btn,
+#threadcub-edge-btn:hover .threadcub-download-btn,
+#threadcub-edge-btn:hover .threadcub-tag-btn,
+#threadcub-edge-btn:hover .threadcub-close-btn {
+  transform: scale(1) !important; /* Return to normal size */
+}
+
+/* Keep action buttons at full scale when flyout is active */
+#threadcub-edge-btn.flyout-active .threadcub-new-btn,
+#threadcub-edge-btn.flyout-active .threadcub-save-btn,
+#threadcub-edge-btn.flyout-active .threadcub-tag-btn,
+#threadcub-edge-btn.flyout-active .threadcub-close-btn {
+  transform: scale(1) !important;
+}
+
+/* Keep download button at its hover appearance when flyout is active */
+#threadcub-edge-btn.flyout-active .threadcub-download-btn {
+  background: var(--color-action-btn-download-bg-hover) !important;
+  color: var(--color-action-btn-download-text-hover) !important;
+  transform: scale(1.1) !important;
+  box-shadow: var(--shadow-action-btn-download-hover) !important;
+}
+
+/* Grip icon visibility on hover */
+#threadcub-edge-btn:hover .threadcub-grip-icon,
+#threadcub-edge-btn.flyout-active .threadcub-grip-icon {
+  opacity: 1;
+}
+
+/* Hide action buttons and show grip icon when dragging */
+#threadcub-edge-btn.dragging .threadcub-action-buttons {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#threadcub-edge-btn.dragging .threadcub-grip-icon {
+  opacity: 1;
+  left: 50% !important;
+  right: auto !important;
+  top: 50% !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%) scale(1) !important; /* Center and enlarge grip icon */
+}
+
+/* ===== Border Overlay ===== */
+#threadcub-border-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: var(--border-width-overlay) solid var(--color-border-overlay);
+  pointer-events: none;
+  z-index: 999998;
+  /* Opacity controlled by JS */
+  transition: opacity var(--transition-base); /* Transition for overlay fade */
+}
+
+/* ===== Tooltip Styles ===== */
+.threadcub-tooltip {
+  position: fixed !important; /* Ensure it stays on top */
+  background: var(--color-tooltip-bg) !important;
+  color: var(--color-tooltip-text) !important;
+  padding: var(--spacing-gap-xs) var(--spacing-3) !important; /* 6px 12px */
+  border-radius: var(--border-radius-base) !important; /* 6px */
+  font-family: var(--font-family-primary) !important;
+  font-size: var(--font-size-tooltip) !important;
+  font-weight: var(--font-weight-tooltip) !important;
+  text-transform: uppercase !important;
+  letter-spacing: var(--font-spacing-tooltip) !important;
+  white-space: nowrap !important;
+  z-index: 10000001 !important;
+  opacity: 0 !important;
+  transform: scale(0.8) !important;
+  transition: all var(--transition-tooltip) !important;
+  pointer-events: none !important;
+  box-shadow: var(--shadow-tooltip) !important;
+  border: var(--border-width-thin) solid var(--color-tooltip-border) !important;
+}
+
+.threadcub-tooltip.show {
+  opacity: 1 !important;
+  transform: scale(1) !important;
+}
+
+/* ===== Toast Notification Styles ===== */
+.threadcub-toast {
+  position: fixed;
+  bottom: 80px; /* Fixed value from original */
+  left: 50%;
+  transform: translateX(-50%) translateY(var(--spacing-2)); /* Initial hidden state, 10px from original */
+  height: var(--toast-height);
+  border-radius: var(--border-radius-lg); /* 8px */
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2); /* 8px */
+  padding: 0 var(--spacing-4); /* 0 16px */
+  font-family: var(--font-family-primary);
+  font-weight: var(--font-weight-toast);
+  font-size: var(--font-size-toast);
+  z-index: 10000000;
+  opacity: 0;
+  transition: all var(--transition-toast);
+  box-shadow: var(--shadow-toast);
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+}
+
+.threadcub-toast-success {
+  background: var(--color-toast-success-bg);
+  color: var(--color-toast-success-text);
+}
+
+.threadcub-toast-error {
+  background: var(--color-toast-error-bg);
+  color: var(--color-toast-error-text);
+}
+
+.threadcub-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0); /* Final visible state */
+}

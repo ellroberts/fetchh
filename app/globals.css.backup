@@ -1,0 +1,413 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =============================================================================
+   ThreadCub Design Tokens - Single Source of Truth (v2 - Complete)
+   ============================================================================= */
+
+/* Global box sizing reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+:root {
+  /* ===== COLORS ===== */
+
+  /* Primary */
+  --color-primary: #6C74FB;
+  --color-primary-hover: #515BFA;
+  --color-primary-light: #A855F7; /* For focus rings - lighter version of primary */
+  --color-primary-dark: #5B21B6; /* For hover states - darker version of primary */
+  --color-primary-bg: #F3F0FF;
+
+  /* Rebrand Surface Tokens */
+  --color-page-bg: var(--color-warm-300);
+  --color-surface: var(--color-warm-50);
+  --color-nav-active: var(--color-warm-white);
+  --color-nav-active-text: var(--color-warm-900);
+  --color-nav-hover: var(--color-warm-200);
+  --color-primary-text: #7C3AED;
+
+  /* Warm Scale — light mode (used for all surfaces, text, borders) */
+  --color-warm-white: #FFFFFF;
+  --color-warm-50:  #FAF8F5;
+  --color-warm-100: #F7F3EE;
+  --color-warm-200: #EFECE6;
+  --color-warm-300: #E6E2DB;
+  --color-warm-400: #D4CFC8;   /* borders, dividers */
+  --color-warm-500: #B8B2AB;   /* subtle borders */
+  --color-warm-600: #948E88;   /* muted text */
+  --color-warm-700: #6B6560;   /* secondary text */
+  --color-warm-800: #3D3830;   /* body / heading text */
+  --color-warm-900: #231F1A;   /* near black */
+
+  /* Neutrals */
+  --color-white: #FFFFFF;
+  --color-gray-50: #F9FAFB;
+  --color-gray-100: #F3F4F6;
+  --color-gray-200: #E5E7EB;
+  --color-gray-300: #D1D5DB;
+  --color-gray-400: #9CA3AF;
+  --color-gray-500: #6B7280;
+  --color-gray-600: #4B5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1F2937;
+  --color-gray-900: #111827;
+
+  /* Semantic & Custom Popup Colors */
+  --color-success: #10B981;
+  --color-error: #EF4444;
+  --color-error-light: #FEF2F2; /* Added for delete button hover */
+  --color-warning: #F59E0B;
+  --color-info: #3B82F6;
+  --color-text-primary: #333;
+  --color-text-secondary: #666;
+  --color-text-muted: #999;
+  --color-title: #8B4513;
+  --color-accent: #00A3E4;
+  --color-accent-teal: #4AADA8;        /* documents, files */
+  --color-accent-teal-hover: #3D9490;
+  --color-accent-teal-bg: #E6F5F4;
+
+  --color-accent-blue: #5B8FF5;        /* chat, threads, communication */
+  --color-accent-blue-hover: #4A7EE4;
+  --color-accent-blue-bg: #EBF1FE;
+
+  --color-accent-amber: #E8A030;       /* AI features, highlights, stars */
+  --color-accent-amber-hover: #D4902A;
+  --color-accent-amber-bg: #FDF0DC;
+
+  --color-accent-rose: #E8607A;        /* projects */
+  --color-accent-rose-hover: #D4506A;
+  --color-accent-rose-bg: #FDEEF1;
+
+  --color-accent-green: #52A878;       /* tags, collections, organisation */
+  --color-accent-green-hover: #429768;
+  --color-accent-green-bg: #E8F5EE;
+  --color-highlight: #555;
+  --color-toggle-inactive: #ccc;
+  --color-warning-bg: #fff3cd;
+  --color-warning-border: #ffeaa7;
+  --color-warning-text: #856404;
+
+  /* Borders */
+  --color-border: #EAEAEA;
+  --color-border-card: #EDE4D9;
+  --color-card-default: var(--color-warm-white);
+  --color-card-hover: var(--color-warm-50);
+  --color-border-light: #f0f0f0;
+  --color-border-form: #e9ecef;
+
+  /* Priority Tags */
+  --color-priority-high-bg: #EDFBCD;
+  --color-priority-high-text: #67A221;
+  --color-priority-medium-bg: #FEF3C9;
+  --color-priority-medium-text: #D77720;
+  --color-priority-low-bg: #FFF1F2;
+  --color-priority-low-text: #F24261;
+  --color-add-tag-background: #E5E7EB; /* Added for add tag button */
+  --color-add-tag-text: #4B5563; /* Added for add tag button */
+
+  /* Tooltip */
+  --color-tooltip-bg: #475569;
+  --color-tooltip-text: #FFFFFF;
+  --color-tooltip-border: rgba(255, 255, 255, 0.1); /* Added from floating-button.js */
+
+  /* Floating Button Specific Colors */
+  --color-floating-btn-bg: rgba(255, 255, 255, 0.95); /* Adjusted from floating-button.js */
+  --color-floating-btn-border: rgba(226, 232, 240, 0.8); /* Adjusted from floating-button.js */
+  --color-floating-btn-text: #94a3b8; /* Adjusted from floating-button.js */
+  --color-floating-btn-hover-bg: rgba(255, 255, 255, 1); /* Adjusted from floating-button.js */
+  --color-floating-btn-hover-border: #4F46E5; /* Primary accent color for hover */
+  --color-floating-btn-grip-icon: #94a3b8; /* Adjusted from floating-button.js */
+
+  --color-action-btn-bg: rgba(255, 255, 255, 0.95); /* Adjusted from floating-button.js */
+  --color-action-btn-border: rgba(255, 255, 255, 0.3); /* Adjusted from floating-button.js */
+  --color-action-btn-text: #64748b; /* Adjusted from floating-button.js */
+
+  /* Specific action button hover colors */
+  --color-action-btn-new-bg-hover: #925FE2; /* From floating-button.js */
+  --color-action-btn-new-text-hover: var(--color-white); /* From floating-button.js */
+  --color-action-btn-download-bg-hover: #99DAFA; /* From floating-button.js */
+  --color-action-btn-download-text-hover: #4C596E; /* From floating-button.js */
+  --color-action-btn-tag-bg-hover: #FFD700; /* From floating-button.js */
+  --color-action-btn-tag-text-hover: #4C596E; /* From floating-button.js */
+  --color-action-btn-close-bg-hover: #ef4444; /* From floating-button.js */
+  --color-action-btn-close-text-hover: var(--color-white); /* From floating-button.js */
+
+  /* Shadow Button */
+  --color-shadow-btn-bg: rgba(79, 70, 229, 0.3); /* From floating-button.js */
+  --color-shadow-btn-border: rgba(79, 70, 229, 0.6); /* From floating-button.js */
+  --color-border-overlay: #4F46E5; /* From floating-button.js */
+
+  /* Toast Notification Colors */
+  --color-toast-success-bg: #DDFCFC; /* From floating-button.js */
+  --color-toast-success-text: #4B84A3; /* From floating-button.js */
+  --color-toast-error-bg: #FAE1E1; /* From floating-button.js */
+  --color-toast-error-text: #E32920; /* From floating-button.js */
+
+  /* Alert Component Colors */
+  --color-alert-success-bg: #DCFCE7;
+  --color-alert-success-text: #166534;
+  --color-alert-success-border: #BBF7D0;
+  --color-alert-error-bg: #FEF2F2;
+  --color-alert-error-text: #DC2626;
+  --color-alert-error-border: #FECACA;
+  --color-alert-warning-bg: #FFFBEB;
+  --color-alert-warning-text: #D97706;
+  --color-alert-warning-border: #FED7AA;
+  --color-alert-info-bg: #EFF6FF;
+  --color-alert-info-text: #2563EB;
+  --color-alert-info-border: #DBEAFE;
+
+  /* ===== SPACING ===== */
+  --spacing-0: 0px;
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-7: 28px;
+  --spacing-8: 32px;
+  --spacing-9: 36px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-13: 56px;
+  --spacing-14: 64px;
+  --spacing-15: 72px;
+  --spacing-16: 80px;
+  --spacing-gap-xs: 6px;
+
+  /* ===== TYPOGRAPHY ===== */
+  --font-family-title: 'Averia Sans Libre', cursive;
+  --font-family-primary: 'Karla', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-base: 16px;
+  --font-size-lg: 18px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 32px;
+  --font-size-4xl: 40px;
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+  --font-size-floating-btn-bear-face: 32px;
+  --font-size-tooltip: 13px;
+  --font-weight-tooltip: 600;
+  --font-spacing-tooltip: 0.5px;
+  --font-weight-toast: 800;
+  --font-size-toast: 14px;
+
+  /* ===== BORDERS & RADII ===== */
+  --border-width-thin: 1px;
+  --border-radius-base: 4px;
+  --border-radius-lg: 8px;
+  --border-radius-xl: 12px;
+  --border-radius-full: 50%;
+  --border-width-btn: 2px;
+  --border-width-action-btn: 1px;
+  --border-width-overlay: 4px;
+  --border-width-medium: 2px;
+  --border-width-checkbox: 2px;
+
+  /* ===== SHADOWS ===== */
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-floating-btn-default: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --shadow-floating-btn-hover: 0 4px 16px rgba(0, 0, 0, 0.2);
+  --shadow-floating-btn-dragging: 0 8px 24px rgba(0, 0, 0, 0.25);
+  --shadow-action-btn-default: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-action-btn-new-hover: 0 4px 12px rgba(146, 95, 226, 0.4);
+  --shadow-action-btn-download-hover: 0 4px 12px rgba(153, 218, 250, 0.4);
+  --shadow-action-btn-tag-hover: 0 4px 12px rgba(254, 239, 144, 0.4);
+  --shadow-action-btn-close-hover: 0 4px 12px rgba(239, 68, 68, 0.4);
+  --shadow-tooltip: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+  /* ===== TRANSITIONS ===== */
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.3s ease;
+  --transition-action-buttons: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-drag-snap: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-tooltip: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-toast: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ===== COMPONENT SIZES ===== */
+  --popup-width: 380px;
+  --popup-height: 600px;
+  --logo-size: 80px;
+  --icon-size-base: 24px;
+  --icon-size-action-btn: 14px;
+  --icon-size-grip: 16px;
+  --min-touch-target: 48px;
+  --toggle-width: 52px;
+  --toggle-height: 28px;
+  --toggle-slider-size: 24px;
+  --floating-button-size: 60px;
+  --floating-button-bear-img-size: 48px;
+  --action-button-size: 32px;
+  --shadow-button-size: 48px;
+  --toast-height: 40px;
+
+  /* ===== SIDEBAR ===== */
+  --sidebar-width-expanded: 280px;
+  --sidebar-width-collapsed: 64px;
+  --sidebar-nav-item-height: 40px;
+  --sidebar-nav-gap: 2px;
+}
+
+/* Input placeholder text */
+input::placeholder {
+  color: var(--color-gray-400);
+  opacity: 1;
+}
+
+/* =============================================================================
+   shadcn/ui HSL Tokens — used by components via hsl(var(--token))
+   ============================================================================= */
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 220 9% 20%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 9% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 9% 20%;
+    --primary: 263 70% 57%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 9% 20%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 45%;
+    --accent: 220 14% 96%;
+    --accent-foreground: 220 9% 20%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 92%;
+    --input: 0 0% 92%;
+    --ring: 263 70% 57%;
+    --radius: 0.5rem;
+    --chart-1: 263 70% 57%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+  }
+
+  .dark {
+    --background: 220 9% 4%;
+    --foreground: 0 0% 98%;
+    --card: 220 9% 11%;
+    --card-foreground: 0 0% 98%;
+    --popover: 220 9% 7%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 263 65% 73%; /* purple #AC8CE7 */
+    --primary-foreground: 0 0% 100%;
+    --color-primary: #6C74FB;        /* lighter purple for dark mode */
+    --color-success: #3DD49C;        /* lighter green for dark mode */
+    --color-info: #72A3F5;           /* lighter blue for dark mode */
+    --secondary: 220 9% 12%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 220 9% 15%;
+    --muted-foreground: 220 9% 64%;
+    --accent: 220 9% 15%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 216 16% 28%;
+    --input: 220 9% 15%;
+    --ring: 263 70% 57%;
+    --chart-1: 263 70% 57%;
+    --chart-2: 158 62% 54%; /* green #3DD49C */
+    --chart-3: 217 85% 71%;  /* blue #72A3F5 */
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* =============================================================================
+   Dark mode overrides for custom --color-* tokens
+   ============================================================================= */
+
+.dark {
+  /* Warm scale — dark mode maps to pure neutrals */
+  --color-warm-white: #141414;
+  --color-warm-50:  #1A1A1A;
+  --color-warm-100: #242424;
+  --color-warm-200: #2E2E2E;
+  --color-warm-300: #3D3D3D;
+  --color-warm-400: #555555;
+  --color-warm-500: #737373;
+  --color-warm-600: #959595;
+  --color-warm-700: #B8B8B8;
+  --color-warm-800: #D4D4D4;
+  --color-warm-900: #F0F0F0;
+
+  /* Surface tokens — reference warm scale */
+  --color-surface:          var(--color-warm-200);
+  --color-page-bg:          var(--color-warm-100);
+  --color-nav-active:       var(--color-warm-400);
+  --color-nav-active-text:  var(--color-warm-900);
+  --color-nav-hover:        var(--color-warm-300);
+  --color-card-default:     rgba(255,255,255,0.04);
+  --color-card-hover:       var(--color-warm-300);
+
+  /* Borders */
+  --color-border:           var(--color-warm-300);
+  --color-border-card:      var(--color-warm-300);
+  --color-border-light:     var(--color-warm-200);
+  --color-border-form:      var(--color-warm-300);
+
+  /* Text */
+  --color-white:            #F0F0F0;
+  --color-text-primary:     #f3f4f6;
+  --color-text-secondary:   #d1d5db;
+  --color-text-muted:       #9ca3af;
+
+  /* Status */
+  --color-primary-bg:       #2e1065;
+  --color-error-light:      #450a0a;
+  --color-warning-bg:       #451a03;
+  --color-warning-border:   #78350f;
+  --color-warning-text:     #fde68a;
+
+  /* Floating button */
+  --color-floating-btn-bg:     rgba(31, 41, 55, 0.95);
+  --color-floating-btn-border: rgba(55, 65, 81, 0.8);
+  --color-floating-btn-text:   #9ca3af;
+  --color-action-btn-bg:       rgba(31, 41, 55, 0.95);
+  --color-tooltip-bg:          #1f2937;
+  --color-add-tag-background:  #374151;
+  --color-add-tag-text:        #d1d5db;
+
+  /* Alerts */
+  --color-alert-success-bg:     #052e16;
+  --color-alert-success-text:   #86efac;
+  --color-alert-success-border: #166534;
+  --color-alert-error-bg:       #450a0a;
+  --color-alert-error-text:     #fca5a5;
+  --color-alert-error-border:   #dc2626;
+  --color-alert-warning-bg:     #451a03;
+  --color-alert-warning-text:   #fde68a;
+  --color-alert-warning-border: #d97706;
+  --color-alert-info-bg:        #172554;
+  --color-alert-info-text:      #93c5fd;
+  --color-alert-info-border:    #2563eb;
+}
+/* ── Global input focus style ─────────────────────────────────────────────── */
+input:not([type="checkbox"]):not([type="radio"]):focus,
+textarea:not(.rag-input):focus {
+  outline: none !important;
+  border: 2px solid var(--color-primary) !important;
+  background-color: var(--color-card-hover) !important;
+}

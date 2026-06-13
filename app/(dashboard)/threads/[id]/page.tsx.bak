@@ -1,0 +1,424 @@
+// app/(dashboard)/threads/[id]/page.tsx
+'use client'
+
+import { useEffect, useState, useRef } from 'react'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
+import { createSupabaseClient } from '../../../../lib/supabase'
+import { Alert } from '@/components/Alert'
+import { User } from '@supabase/supabase-js'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { ArrowLeft } from 'lucide-react'
+
+function formatPlatformName(platform: string): string {
+  const platformMap: Record<string, string> = {
+    'chatgpt': 'ChatGPT',
+    'claude': 'Claude',
+    'gemini': 'Gemini',
+    'unknown': 'Unknown',
+    'web_interface': 'Web',
+    'chrome_extension': 'Extension'
+  }
+  return platformMap[platform?.toLowerCase()] || platform || 'Unknown'
+}
+
+interface Message {
+  id: number
+  role: 'user' | 'assistant'
+  content: string
+  timestamp?: string
+}
+
+interface Conversation {
+  id: string
+  title: string
+  platform: string
+  source: string
+  created_at: string
+  updated_at: string
+  message_count: number
+  summary: string
+  content: any
+  messages: any
+  user_id: string
+  project_id?: string | null
+}
+
+interface Project {
+  id: string
+  name: string
+  description?: string | null
+  created_at: string
+  updated_at?: string
+}
+
+export default function ThreadDetailPage() {
+  const [user, setUser] = useState<User | null>(null)
+  const [conversation, setConversation] = useState<Conversation | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isContinueMode, setIsContinueMode] = useState(false)
+  const [newMessage, setNewMessage] = useState('')
+  const [sendingMessage, setSendingMessage] = useState(false)
+  const [showProjectModal, setShowProjectModal] = useState(false)
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+  const [highlightedMessageIndex, setHighlightedMessageIndex] = useState<number | null>(null)
+
+  const router = useRouter()
+  const params = useParams()
+  const searchParams = useSearchParams()
+  const conversationId = params.id as string
+  const supabase = createSupabaseClient()
+
+  const messageRefs = useRef<(HTMLDivElement | null)[]>([])
+  const highlightParam = searchParams.get('highlight')
+
+  useEffect(() => {
+    if (searchParams.get('mode') === 'continue') {
+      setIsContinueMode(true)
+    }
+    if (conversationId) {
+      fetchConversationDetail()
+      fetchProjects()
+    }
+  }, [conversationId, searchParams])
+
+  useEffect(() => {
+    if (!highlightParam || messages.length === 0) return
+    const decoded = decodeURIComponent(highlightParam)
+    const idx = messages.findIndex(m =>
+      m.content.toLowerCase().includes(decoded.toLowerCase().slice(0, 80))
+    )
+    if (idx === -1) return
+    setHighlightedMessageIndex(idx)
+    setTimeout(() => {
+      messageRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setTimeout(() => setHighlightedMessageIndex(null), 3000)
+    }, 400)
+  }, [messages, highlightParam])
+
+  const fetchConversationDetail = async () => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError) throw userError
+      if (!user) { router.push('/auth'); return }
+      setUser(user)
+      const { data, error: convError } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('id', conversationId)
+        .single()
+      if (convError) throw convError
+      setConversation(data)
+      if (data?.content && data.content.messages) {
+        setMessages(data.content.messages)
+      } else if (data?.messages) {
+        setMessages(data.messages)
+      }
+    } catch (error: any) {
+      console.error('Error fetching conversation:', error)
+      setError(error.message || 'Failed to fetch conversation')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (!error && data) setProjects(data)
+    } catch (error: any) {
+      console.error('Error fetching projects:', error)
+    }
+  }
+
+  const formatTimestamp = (timestamp?: string) => {
+    if (!timestamp) return ''
+    return new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || sendingMessage) return
+    setSendingMessage(true)
+    try {
+      const userMessage: Message = {
+        id: messages.length + 1,
+        role: 'user',
+        content: newMessage,
+        timestamp: new Date().toISOString()
+      }
+      setMessages(prev => [...prev, userMessage])
+      setNewMessage('')
+      setTimeout(() => {
+        const aiResponse: Message = {
+          id: messages.length + 2,
+          role: 'assistant',
+          content: `I understand you're continuing our conversation about "${conversation?.title}". Based on your message "${newMessage}", let me provide a thoughtful response...`,
+          timestamp: new Date().toISOString()
+        }
+        setMessages(prev => [...prev, aiResponse])
+        setSendingMessage(false)
+      }, 1500)
+      await updateConversation()
+    } catch (error) {
+      console.error('Error sending message:', error)
+      alert('Failed to send message. Please try again.')
+      setSendingMessage(false)
+    }
+  }
+
+  const updateConversation = async () => {
+    if (!conversation) return
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .update({ content: { messages }, message_count: messages.length, updated_at: new Date().toISOString() })
+        .eq('id', conversationId)
+      if (error) throw error
+    } catch (error) {
+      console.error('Error updating conversation:', error)
+    }
+  }
+
+  const addToProject = async () => {
+    if (!selectedProjectId || !conversation) return
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .update({ project_id: selectedProjectId })
+        .eq('id', conversationId)
+      if (error) throw error
+      setConversation({ ...conversation, project_id: selectedProjectId })
+      setShowProjectModal(false)
+      setSelectedProjectId('')
+      alert('Added to project successfully!')
+    } catch (error: any) {
+      alert(error.message || 'Failed to add to project')
+    }
+  }
+
+  const removeFromProject = async () => {
+    if (!conversation) return
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .update({ project_id: null })
+        .eq('id', conversationId)
+      if (error) throw error
+      setConversation({ ...conversation, project_id: null })
+      alert('Removed from project successfully!')
+    } catch (error: any) {
+      alert(error.message || 'Failed to remove from project')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <div className="p-4 md:p-8">
+          <div className="flex items-center justify-center h-96">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !conversation) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <div className="p-4 md:p-8">
+          <Alert type="error">
+            <strong>Error</strong>
+            <p className="text-sm mt-1">{error || 'Conversation not found'}</p>
+            <Button variant="outline" size="sm" onClick={() => router.push('/threads')} className="mt-4">
+              Back to Threads
+            </Button>
+          </Alert>
+        </div>
+      </div>
+    )
+  }
+
+  const cameFromRag = !!highlightParam
+
+  return (
+    <div className="max-w-7xl mx-auto">
+      <div className="p-4 md:p-8">
+
+        {showProjectModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card text-card-foreground rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-lg font-semibold mb-4">Add to Project</h3>
+              <p className="text-sm text-muted-foreground mb-4">Select a project for this conversation</p>
+              <select
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                className="w-full p-2 border border-border rounded-md mb-4 bg-background text-foreground"
+              >
+                <option value="">Select a project...</option>
+                {projects.map(project => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </select>
+              <div className="flex space-x-2">
+                <Button onClick={addToProject} disabled={!selectedProjectId}>Add to Project</Button>
+                <Button variant="outline" onClick={() => { setShowProjectModal(false); setSelectedProjectId('') }}>Cancel</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <Card className="mb-6">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl md:text-2xl font-bold mb-2 text-foreground break-words">
+                  {conversation.title || 'Untitled Conversation'}
+                </h1>
+                <div className="flex items-center text-xs md:text-sm text-muted-foreground flex-wrap gap-2 md:gap-4">
+                  <Badge variant="secondary">
+                    {formatPlatformName(conversation.platform || conversation.source)}
+                  </Badge>
+                  <span className="whitespace-nowrap">{new Date(conversation.created_at).toLocaleDateString()}</span>
+                  <span className="whitespace-nowrap">{conversation.message_count} messages</span>
+                  {conversation.project_id && (
+                    <Badge variant="outline" className="text-green-600 border-green-600">In Project</Badge>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center flex-wrap gap-2 lg:flex-shrink-0">
+                {conversation.project_id ? (
+                  <Button variant="outline" size="sm" onClick={removeFromProject}>Remove from Project</Button>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => setShowProjectModal(true)}>Add to Project</Button>
+                )}
+                <Button
+                  variant={isContinueMode ? 'outline' : 'default'}
+                  size="sm"
+                  onClick={() => setIsContinueMode(!isContinueMode)}
+                >
+                  {isContinueMode ? 'View Only' : 'Continue'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.back()}
+                  className="flex items-center gap-1.5"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Back
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {cameFromRag && (
+          <div className="mb-4 flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            <span>🐾</span>
+            <span>Coda highlighted the relevant part of this thread below</span>
+          </div>
+        )}
+
+        {isContinueMode && (
+          <Alert type="info" style={{ marginBottom: '1rem' }}>
+            <strong>Continue Mode Active</strong>
+            <p className="text-sm mt-1">Type your message below and press Enter or click Send.</p>
+          </Alert>
+        )}
+
+        <Card className="overflow-hidden">
+          <div className="divide-y divide-border">
+            {messages.length === 0 ? (
+              <div className="p-6 md:p-8 text-center text-muted-foreground">
+                <p>No messages found in this conversation.</p>
+              </div>
+            ) : (
+              messages.map((message, index) => {
+                const isHighlighted = highlightedMessageIndex === index
+                return (
+                  <div
+                    key={message.id || index}
+                    ref={el => { messageRefs.current[index] = el }}
+                    className={`p-4 md:p-6 transition-colors duration-700 ${
+                      message.role === 'assistant' ? 'bg-muted/50' : ''
+                    } ${isHighlighted ? 'bg-amber-50 dark:bg-amber-900/20' : ''}`}
+                  >
+                    {isHighlighted && (
+                      <div className="flex items-center gap-1.5 mb-2 text-xs text-amber-600 font-medium">
+                        <span>🐾</span>
+                        <span>Source from Coda's trail</span>
+                      </div>
+                    )}
+                    <div className="flex items-start space-x-2 md:space-x-3">
+                      <div className={`flex-shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-sm md:text-base ${
+                        message.role === 'assistant'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {message.role === 'assistant' ? '🤖' : '👤'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs md:text-sm font-medium text-foreground">
+                            {message.role === 'assistant' ? 'Assistant' : 'You'}
+                          </span>
+                          {message.timestamp && (
+                            <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
+                              {formatTimestamp(message.timestamp)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm md:text-base text-foreground prose prose-sm max-w-none dark:prose-invert break-words">
+                          {message.content.split('\n').map((paragraph, idx) => (
+                            <p key={idx} className="mb-2 last:mb-0">{paragraph}</p>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          {isContinueMode && (
+            <div className="border-t border-border p-3 md:p-4">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <textarea
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSendMessage()
+                    }
+                  }}
+                  placeholder="Type your message here..."
+                  className="flex-1 p-2 md:p-3 border border-input rounded-lg resize-none focus:ring-2 focus:ring-ring focus:border-transparent bg-background text-foreground text-sm md:text-base"
+                  rows={3}
+                  disabled={sendingMessage}
+                />
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={!newMessage.trim() || sendingMessage}
+                  className="sm:self-end"
+                >
+                  {sendingMessage ? 'Sending...' : 'Send'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+
+      </div>
+    </div>
+  )
+}

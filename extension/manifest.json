@@ -1,0 +1,142 @@
+{
+  "manifest_version": 3,
+  "name": "ThreadCub",
+  "version": "1.1.2",
+  "description": "Save, tag, and resume your AI chats across platforms. ThreadCub makes long conversations organised, searchable, and stress-free.",
+
+  
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png", 
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/icon16.png",
+        "icons/icon32.png",
+        "icons/icon48.png",
+        "icons/icon128.png",
+        "icons/icon-48.png",
+        "icons/icon-happy.png",
+        "icons/icon-sad.png",
+        "icons/icon-happier.png",
+        "icons/threadcub-logo.png",
+        "icons/threadcub-logo.png",
+        "assets/images/floating-button.gif",
+        "assets/images/install.gif",
+        "assets/images/highlight.gif",
+        "assets/images/welcome-coda.png"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
+
+  "permissions": [
+    "activeTab",
+    "downloads",
+    "storage",
+    "scripting",
+    "notifications"
+  ],
+  
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://gemini.google.com/*",
+    "https://copilot.microsoft.com/*",
+    "https://grok.x.ai/*",
+    "https://grok.com/*",
+    "https://x.com/i/grok", "https://x.com/i/grok/*", "https://x.com/*",
+    "https://chat.deepseek.com/*",
+    "https://www.perplexity.ai/*",
+    "https://perplexity.ai/*",
+    "https://threadcub.com/*",
+    "https://*.threadcub.com/*",
+    "https://www.google-analytics.com/*"
+  ],
+  
+  "background": {
+    "service_worker": "background.js"
+  },
+  
+  "content_scripts": [
+  {
+    "matches": [
+      "https://claude.ai/*",
+      "https://chat.openai.com/*",
+      "https://chatgpt.com/*",
+      "https://gemini.google.com/*",
+      "https://copilot.microsoft.com/*",
+      "https://grok.x.ai/*",
+      "https://grok.com/*",
+      "https://x.com/i/grok", "https://x.com/i/grok/*", "https://x.com/*",
+      "https://chat.deepseek.com/*",
+      "https://www.perplexity.ai/*",
+      "https://perplexity.ai/*"
+    ],
+    "css": [
+      "assets/tokens.css",
+      "assets/floating-button.css",
+      "assets/side-panel.css",
+      "assets/anchor.css",
+      "assets/conversation-prompt.css"
+    ],
+    "js": [
+      "vendor/crypto-js.min.js",
+      "src/services/analytics.js",
+      "src/utils/platform-detector.js",
+      "src/utils/utilities.js",
+      "src/services/storage-service.js",
+      "src/services/auth-service.js",
+      "src/services/crypto-service.js",
+      "src/services/api-service.js",
+      "src/adapters/platform-adapters.js",
+      "src/core/conversation-extractor.js",
+      "src/utils/rebrand-tokens.js",
+      "src/ui/ui-components.js",
+      "src/ui/side-panel.js",
+      "src/core/floating-button.js",
+      "src/core/onboarding.js",
+      "src/features/anchor-system.js",
+      "src/features/tagging-system.js",
+      "src/features/continuation-system.js",
+      "src/features/platform-autostart.js",
+      "src/features/download-manager.js",
+      "src/features/conversation-length-detector.js",
+      "src/features/copilot-onboarding.js",
+      "src/core/app-initializer.js",
+      "content.js"
+    ],
+    "run_at": "document_idle"
+  },
+  {
+    "matches": ["https://threadcub.com/*", "https://*.threadcub.com/*"],
+    "js": ["src/features/threadcub-session-bridge.js"],
+    "run_at": "document_idle"
+  }
+],
+  
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "ThreadCub Exporter",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "externally_connectable": {
+    "matches": [
+      "https://threadcub.com/*",
+      "https://*.threadcub.com/*"
+    ]
+  },
+
+  "homepage_url": "https://threadcub.com"
+}

@@ -1,0 +1,524 @@
+/* =============================================================================
+   ThreadCub Side Panel Styles
+   ============================================================================= */
+
+/* ===== TAG CARD STYLES ===== */
+.threadcub-tag-card {
+  background: var(--color-white);
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 0;
+  margin-bottom: 8px;
+  position: relative;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+/* Note: JS handles adding/removing box-shadow on hover for specific states.
+   A pure CSS approach would use :hover, but given the JS logic, this aligns. */
+.threadcub-tag-card:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+.card-content {
+  /* No styles needed for the container itself */
+}
+
+.tag-text {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal); /* Changed from 1.4 to use token */
+  color: var(--color-warm-700);
+  margin-bottom: var(--spacing-4);
+  font-family: var(--font-family-primary);
+}
+
+.default-state {
+  display: flex;
+  flex-direction: column;
+}
+
+.card-icon {
+  color: var(--color-warm-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition: opacity var(--transition-base);
+}
+
+.action-buttons {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--spacing-4) !important;
+}
+
+/* Action Button specific styles - high specificity for X.com/Grok override */
+/* Using <button> element for better centering on X.com */
+.action-button,
+button.action-button,
+.threadcub-tag-card .action-button,
+.action-button[data-action] {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: var(--icon-size-base) !important;
+  height: var(--icon-size-base) !important;
+  color: var(--color-warm-500) !important; /* Default icon color */
+  cursor: pointer !important;
+  transition: background var(--transition-base), color var(--transition-base) !important;
+  border-radius: var(--border-radius-base) !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  box-sizing: border-box !important;
+  /* Button reset styles */
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Ensure SVG icons inherit color correctly on all platforms */
+.action-button svg,
+.threadcub-tag-card .action-button svg,
+.action-button[data-action] svg {
+  stroke: currentColor !important;
+  fill: none !important;
+  display: block !important;
+}
+
+
+
+
+.threadcub-tag-card .action-buttons .action-button svg,
+.threadcub-tag-card .action-button[data-action] svg,
+div.threadcub-tag-card .action-button svg {
+  margin: 0 auto !important;
+  display: block !important;
+}
+
+/* ===== PRIORITY TAGS STYLES ===== */
+.priority-tags {
+  display: flex;
+  gap: var(--spacing-1);
+  margin-bottom: var(--spacing-3);
+  flex-wrap: wrap;
+}
+
+.priority-tag {
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: 12px; /* Fixed value, not a direct token */
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-extrabold);
+}
+
+.priority-tag.priority-high {
+  background: var(--color-priority-high-bg);
+  color: var(--color-priority-high-text);
+}
+
+.priority-tag.priority-medium {
+  background: var(--color-priority-medium-bg);
+  color: var(--color-priority-medium-text);
+}
+
+.priority-tag.priority-low {
+  background: var(--color-priority-low-bg);
+  color: var(--color-priority-low-text);
+}
+
+/* ===== NOTE DISPLAY STYLES ===== */
+.note-display {
+  background: var(--color-warm-100);
+  border: var(--border-width-thin) solid var(--color-warm-200); /* Changed from 1px to use token */
+  border-radius: 6px; /* Fixed value, not a direct token */
+  padding: var(--spacing-3);
+  margin-bottom: var(--spacing-3);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal); /* Changed from 1.4 to use token */
+  color: var(--color-warm-700);
+}
+
+/* ===== EMPTY STATE STYLES (Moved from JS inline) ===== */
+#threadcub-empty-state {
+  text-align: center;
+  padding: var(--spacing-8) var(--spacing-5);
+  color: var(--color-warm-500);
+}
+
+.empty-state-icon {
+  width: var(--logo-size); /* Re-used logo-size for consistency if appropriate, or make new token if different semantic meaning */
+  height: var(--logo-size);
+  margin: 0 auto var(--spacing-5);
+  background: linear-gradient(135deg, var(--color-warm-100) 0%, var(--color-warm-200) 100%);
+  border-radius: var(--border-radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-2xl); /* Used 2xl for 32px equivalent */
+}
+
+.empty-state-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin: 0 0 var(--spacing-2);
+  color: var(--color-warm-700);
+}
+
+.empty-state-description {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  margin: 0;
+  max-width: 200px; /* Fixed value */
+  margin: 0 auto;
+}
+
+/* ===== NOTE EDITING STATE STYLES (Moved from JS inline) ===== */
+.note-editing {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.note-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: var(--spacing-3);
+  border: 2px solid var(--color-primary);
+  border-radius: 6px;
+  outline: none !important;
+  box-shadow: none !important;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-warm-700);
+  resize: vertical;
+  font-family: var(--font-family-primary);
+  margin-bottom: 0;
+  box-sizing: border-box;
+  outline: none;
+}
+.note-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Save and Cancel Buttons */
+.save-note-btn,
+.cancel-note-btn {
+  border: none;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--border-radius-base);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  text-transform: none;
+  transition: all var(--transition-base);
+}
+
+.save-note-btn {
+  background: var(--color-warm-200);
+  color: var(--color-warm-500);
+  opacity: 1;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.save-note-btn.active {
+  background: var(--color-primary);
+  color: var(--color-white) !important; /* White text on purple background */
+  opacity: 1;
+  pointer-events: auto; /* Allows clicks when active */
+}
+
+.cancel-note-btn {
+  background: transparent;
+  color: var(--color-warm-500);
+}
+.tag-name-input {
+  width: 100%;
+  padding: var(--spacing-3);
+  border: 2px solid var(--color-primary);
+  border-radius: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--color-warm-700);
+  font-family: var(--font-family-primary);
+  box-sizing: border-box;
+  outline: none !important;
+  box-shadow: none !important;
+  margin-bottom: 8px;
+}
+.tag-colour-options {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.tag-colour-btn {
+  border: 2px solid transparent;
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tag-colour-btn.selected {
+  border-color: currentColor;
+}
+.save-tag-btn {
+  border: none;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--border-radius-base);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  cursor: not-allowed;
+  pointer-events: none;
+  background: var(--color-warm-200);
+  color: var(--color-warm-500);
+  transition: all var(--transition-base);
+}
+.save-tag-btn.active {
+  background: var(--color-primary);
+  color: white;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.remove-note-btn {
+  border: none;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--border-radius-base);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  background: transparent;
+  color: var(--color-rose-500, #F43F5E);
+}
+
+/* ===== TAG EDITING STATE STYLES (Moved from JS inline) ===== */
+.tag-editing {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.priority-options {
+  display: flex;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-3);
+  flex-wrap: wrap;
+}
+
+/* Priority Buttons (shared styles with priority-tag, but these are buttons) */
+.priority-btn {
+  border: none;
+  padding: var(--spacing-1) var(--spacing-3);
+  border-radius: 12px; /* Fixed value */
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-extrabold);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+/* Specific priority button colors are handled by data-priority attribute */
+.priority-btn[data-priority="high"] {
+  background: var(--color-priority-high-bg);
+  color: var(--color-priority-high-text);
+}
+
+.priority-btn[data-priority="medium"] {
+  background: var(--color-priority-medium-bg);
+  color: var(--color-priority-medium-text);
+}
+
+.priority-btn[data-priority="low"] {
+  background: var(--color-priority-low-bg);
+  color: var(--color-priority-low-text);
+}
+
+.add-tag-btn {
+  background: var(--color-add-tag-background);
+  color: var(--color-add-tag-text);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.add-tag-plus {
+  font-size: 10px; /* Fixed value */
+}
+
+.tag-actions {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.cancel-tag-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-warm-500);
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--border-radius-base);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-extrabold);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+/* ===== TOOLTIP STYLES ===== */
+.action-button {
+  position: relative;
+}
+
+.action-button::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--color-warm-800);
+  color: var(--color-warm-white);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.15s ease;
+  pointer-events: none;
+  z-index: 10000;
+}
+
+.action-button:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ===== ANCHOR ITEM STYLES ===== */
+.threadcub-anchor-item {
+  background: var(--color-white);
+  border: var(--border-width-thin) solid var(--color-warm-200);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-4);
+  margin-bottom: var(--spacing-3);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-3);
+  transition: all var(--transition-base);
+}
+
+.threadcub-anchor-item:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+.anchor-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.anchor-item-text {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-warm-700);
+  font-family: var(--font-family-primary);
+}
+
+.anchor-item-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-shrink: 0;
+}
+
+/* Anchor action button styling - matches tag action buttons */
+.anchor-action-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: var(--border-radius-base) !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  color: var(--color-warm-500) !important;
+  transition: all 0.15s ease !important;
+}
+
+.anchor-action-btn:hover {
+  background: var(--color-warm-100) !important;
+  color: var(--color-warm-600) !important;
+}
+
+.anchor-action-btn svg {
+  stroke: currentColor !important;
+  fill: none !important;
+}
+
+/* ===== STANDARDIZED ACTION BUTTON SIZING ===== */
+/* Override action button SVG sizes for consistency */
+.action-button svg,
+.anchor-action-btn svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+/* Action button hover state */
+.action-button:hover,
+button.action-button:hover,
+.threadcub-tag-card .action-button:hover,
+.threadcub-tag-card button.action-button:hover {
+  background: var(--color-warm-100) !important;
+  color: var(--color-warm-600) !important;
+}
+/* Chevron button hover */
+.tc-chevron-btn:hover {
+  background: var(--color-warm-100) !important;
+  color: var(--color-warm-600) !important;
+}
+.tc-chevron-btn {
+  width: var(--icon-size-base) !important;
+  height: var(--icon-size-base) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: var(--border-radius-base) !important;
+  color: var(--color-warm-500) !important;
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+}
+/* ===== CUSTOM TOOLTIPS ===== */
+.tc-tooltip-btn {
+  position: relative;
+}
+.tc-tooltip-btn::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1F2937;
+  color: #FFFFFF;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 99999;
+}
+.tc-tooltip-btn:hover::after {
+  opacity: 1;
+}

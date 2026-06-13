@@ -1,0 +1,289 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =============================================================================
+   ThreadCub Design Tokens - Single Source of Truth (v2 - Complete)
+   ============================================================================= */
+
+/* Global box sizing reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+:root {
+  /* ===== COLORS ===== */
+
+  /* Primary */
+  --color-primary: #7C3AED;
+  --color-primary-hover: #6D28D9;
+  --color-primary-light: #A855F7; /* For focus rings - lighter version of primary */
+  --color-primary-dark: #5B21B6; /* For hover states - darker version of primary */
+  --color-primary-bg: #F3F0FF; /* Light purple background for selected nav items */
+  --color-primary-text: #7C3AED; /* Primary purple for selected text/icons */
+
+  /* Neutrals */
+  --color-white: #FFFFFF;
+  --color-gray-50: #F9FAFB;
+  --color-gray-100: #F3F4F6;
+  --color-gray-200: #E5E7EB;
+  --color-gray-300: #D1D5DB;
+  --color-gray-400: #9CA3AF;
+  --color-gray-500: #6B7280;
+  --color-gray-600: #4B5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1F2937;
+  --color-gray-900: #111827;
+
+  /* Semantic & Custom Popup Colors */
+  --color-success: #10B981;
+  --color-error: #EF4444;
+  --color-error-light: #FEF2F2; /* Added for delete button hover */
+  --color-warning: #F59E0B;
+  --color-info: #3B82F6;
+  --color-text-primary: #333;
+  --color-text-secondary: #666;
+  --color-text-muted: #999;
+  --color-title: #8B4513;
+  --color-accent: #00A3E4;
+  --color-accent-blue: #4A90E2;
+  --color-highlight: #555;
+  --color-toggle-inactive: #ccc;
+  --color-warning-bg: #fff3cd;
+  --color-warning-border: #ffeaa7;
+  --color-warning-text: #856404;
+
+  /* Borders */
+  --color-border: #EAEAEA;
+  --color-border-light: #f0f0f0;
+  --color-border-form: #e9ecef;
+
+  /* Priority Tags */
+  --color-priority-high-bg: #EDFBCD;
+  --color-priority-high-text: #67A221;
+  --color-priority-medium-bg: #FEF3C9;
+  --color-priority-medium-text: #D77720;
+  --color-priority-low-bg: #FFF1F2;
+  --color-priority-low-text: #F24261;
+  --color-add-tag-background: #E5E7EB; /* Added for add tag button */
+  --color-add-tag-text: #4B5563; /* Added for add tag button */
+
+  /* Tooltip */
+  --color-tooltip-bg: #475569;
+  --color-tooltip-text: #FFFFFF;
+  --color-tooltip-border: rgba(255, 255, 255, 0.1); /* Added from floating-button.js */
+
+  /* Floating Button Specific Colors */
+  --color-floating-btn-bg: rgba(255, 255, 255, 0.95); /* Adjusted from floating-button.js */
+  --color-floating-btn-border: rgba(226, 232, 240, 0.8); /* Adjusted from floating-button.js */
+  --color-floating-btn-text: #94a3b8; /* Adjusted from floating-button.js */
+  --color-floating-btn-hover-bg: rgba(255, 255, 255, 1); /* Adjusted from floating-button.js */
+  --color-floating-btn-hover-border: #4F46E5; /* Primary accent color for hover */
+  --color-floating-btn-grip-icon: #94a3b8; /* Adjusted from floating-button.js */
+
+  --color-action-btn-bg: rgba(255, 255, 255, 0.95); /* Adjusted from floating-button.js */
+  --color-action-btn-border: rgba(255, 255, 255, 0.3); /* Adjusted from floating-button.js */
+  --color-action-btn-text: #64748b; /* Adjusted from floating-button.js */
+
+  /* Specific action button hover colors */
+  --color-action-btn-new-bg-hover: #925FE2; /* From floating-button.js */
+  --color-action-btn-new-text-hover: var(--color-white); /* From floating-button.js */
+  --color-action-btn-download-bg-hover: #99DAFA; /* From floating-button.js */
+  --color-action-btn-download-text-hover: #4C596E; /* From floating-button.js */
+  --color-action-btn-tag-bg-hover: #FFD700; /* From floating-button.js */
+  --color-action-btn-tag-text-hover: #4C596E; /* From floating-button.js */
+  --color-action-btn-close-bg-hover: #ef4444; /* From floating-button.js */
+  --color-action-btn-close-text-hover: var(--color-white); /* From floating-button.js */
+
+  /* Shadow Button */
+  --color-shadow-btn-bg: rgba(79, 70, 229, 0.3); /* From floating-button.js */
+  --color-shadow-btn-border: rgba(79, 70, 229, 0.6); /* From floating-button.js */
+  --color-border-overlay: #4F46E5; /* From floating-button.js */
+
+  /* Toast Notification Colors */
+  --color-toast-success-bg: #DDFCFC; /* From floating-button.js */
+  --color-toast-success-text: #4B84A3; /* From floating-button.js */
+  --color-toast-error-bg: #FAE1E1; /* From floating-button.js */
+  --color-toast-error-text: #E32920; /* From floating-button.js */
+
+  /* Alert Component Colors */
+  /* Success Alert Colors */
+  --color-alert-success-bg: #DCFCE7;
+  --color-alert-success-text: #166534;
+  --color-alert-success-border: #BBF7D0;
+  
+  /* Error Alert Colors */
+  --color-alert-error-bg: #FEF2F2;
+  --color-alert-error-text: #DC2626;
+  --color-alert-error-border: #FECACA;
+  
+  /* Warning Alert Colors */
+  --color-alert-warning-bg: #FFFBEB;
+  --color-alert-warning-text: #D97706;
+  --color-alert-warning-border: #FED7AA;
+  
+  /* Info Alert Colors */
+  --color-alert-info-bg: #EFF6FF;
+  --color-alert-info-text: #2563EB;
+  --color-alert-info-border: #DBEAFE;
+
+  /* ===== SPACING ===== */
+  --spacing-0: 0px;
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-7: 28px;
+  --spacing-8: 32px;
+  --spacing-9: 36px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-13: 56px;
+  --spacing-14: 64px;
+  --spacing-15: 72px;
+  --spacing-16: 80px;
+  --spacing-gap-xs: 6px; /* Added for action buttons gap */
+
+
+  /* ===== TYPOGRAPHY ===== */
+  --font-family-title: 'Averia Sans Libre', cursive;
+  --font-family-primary: 'Karla', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-base: 16px;
+  --font-size-lg: 18px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 32px;
+  --font-size-4xl: 40px;
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800; /* Added this as it was used in JS */
+
+  /* Specific font sizes for floating button components */
+  --font-size-floating-btn-bear-face: 32px; /* From floating-button.js */
+  --font-size-tooltip: 13px; /* From floating-button.js */
+  --font-weight-tooltip: 600; /* From floating-button.js */
+  --font-spacing-tooltip: 0.5px; /* From floating-button.js */
+  --font-weight-toast: 800; /* From floating-button.js */
+  --font-size-toast: 14px; /* From floating-button.js */
+
+  /* ===== BORDERS & RADII ===== */
+  --border-width-thin: 1px;
+  --border-radius-base: 4px;
+  --border-radius-lg: 8px;
+  --border-radius-xl: 12px;
+  --border-radius-full: 50%;
+  --border-width-btn: 2px; /* For the main button */
+  --border-width-action-btn: 1px; /* For action buttons */
+  --border-width-overlay: 4px; /* For border overlay */
+  --border-width-medium: 2px;
+  --border-width-checkbox: 2px; /* Checkboxes often need thicker borders for visibility */
+
+
+  /* ===== SHADOWS ===== */
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.1); /* Added for consistent hover effect */
+
+  /* Floating Button Specific Shadows */
+  --shadow-floating-btn-default: 0 2px 8px rgba(0, 0, 0, 0.15); /* From floating-button.js */
+  --shadow-floating-btn-hover: 0 4px 16px rgba(0, 0, 0, 0.2); /* From floating-button.js */
+  --shadow-floating-btn-dragging: 0 8px 24px rgba(0, 0, 0, 0.25); /* From floating-button.js */
+  --shadow-action-btn-default: 0 2px 8px rgba(0, 0, 0, 0.08); /* From floating-button.js */
+  --shadow-action-btn-new-hover: 0 4px 12px rgba(146, 95, 226, 0.4); /* From floating-button.js */
+  --shadow-action-btn-download-hover: 0 4px 12px rgba(153, 218, 250, 0.4); /* From floating-button.js */
+  --shadow-action-btn-tag-hover: 0 4px 12px rgba(254, 239, 144, 0.4); /* From floating-button.js */
+  --shadow-action-btn-close-hover: 0 4px 12px rgba(239, 68, 68, 0.4); /* From floating-button.js */
+  --shadow-tooltip: 0 4px 12px rgba(0, 0, 0, 0.15); /* From floating-button.js */
+  --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.1); /* From floating-button.js */
+
+  /* ===== OTHERS ===== */
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.3s ease;
+  --transition-action-buttons: 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* From floating-button.js */
+  --transition-drag-snap: 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* For button snap after drag */
+  --transition-tooltip: 0.2s cubic-bezier(0.4, 0, 0.2, 1); /* From floating-button.js */
+  --transition-toast: 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* From floating-button.js */
+  
+  /* Component Sizes */
+  --popup-width: 380px;
+  --popup-height: 600px;
+  --logo-size: 80px;
+  --icon-size-base: 24px; /* Standard icon size */
+  --icon-size-action-btn: 14px; /* Small icon size for action buttons */
+  --icon-size-grip: 16px; /* Size for grip icon */
+  --min-touch-target: 48px;
+  --toggle-width: 52px;
+  --toggle-height: 28px;
+  --toggle-slider-size: 24px;
+  --floating-button-size: 60px; /* From floating-button.js */
+  --floating-button-bear-img-size: 48px; /* From floating-button.js */
+  --action-button-size: 32px; /* From floating-button.js */
+  --shadow-button-size: 48px; /* From floating-button.js */
+  --toast-height: 40px; /* From floating-button.js */
+
+  /* Sidebar specific spacing */
+  --sidebar-width-expanded: 280px; /* Wider to match Calendly */
+  --sidebar-width-collapsed: 64px;
+  --sidebar-nav-item-height: 40px; /* Consistent nav item height */
+  --sidebar-nav-gap: 2px; /* Tight gap between nav items */
+
+/* Input placeholder text */
+input::placeholder {
+  color: var(--color-gray-400); /* or another token */
+  opacity: 1; /* prevents browsers from dimming the placeholder */
+}
+
+}
+
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    /* ... all your existing :root HSL tokens ... */
+  }
+
+  .dark {
+    --background: 220 9% 4%;
+    --foreground: 0 0% 98%;
+    /* ... all your existing dark HSL tokens ... */
+    /* NO nested .dark block in here */
+  }
+}
+
+/* Custom token dark overrides — outside @layer base */
+.dark {
+  --color-white: #1f2937;
+  --color-gray-50: #1f2937;
+  --color-gray-100: #374151;
+  --color-gray-200: #374151;
+  --color-gray-300: #4b5563;
+  --color-gray-400: #6b7280;
+  --color-gray-500: #9ca3af;
+  --color-gray-600: #d1d5db;
+  --color-gray-700: #e5e7eb;
+  --color-gray-800: #f3f4f6;
+  --color-gray-900: #f9fafb;
+  --color-border: #374151;
+  --color-border-light: #2d3748;
+  --color-border-form: #374151;
+  --color-text-primary: #f3f4f6;
+  --color-text-secondary: #d1d5db;
+  --color-text-muted: #9ca3af;
+  --color-primary-bg: #2e1065;
+  --color-error-light: #450a0a;
+  --color-warning-bg: #451a03;
+  --color-warning-border: #78350f;
+  --color-warning-text: #fde68a;
+  --color-floating-btn-bg: rgba(31, 41, 55, 0.95);
+  --color-floating-btn-border: rgba(55, 65, 81, 0.8);
+  --color-floating-btn-text: #9ca3af;
+  --color-action-btn-bg: rgba(31, 41, 55, 0.95);
+  --color-tooltip-bg: #1f2937;
+}

@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "threadcub": {
+      "command": "node",
+      "args": ["${pluginDir}/index.js"],
+      "env": {
+        "THREADCUB_TOKEN": "${input:threadcub_token}"
+      },
+      "inputs": [
+        {
+          "id": "threadcub_token",
+          "type": "promptString",
+          "description": "Your ThreadCub API token — find it at threadcub.com/settings",
+          "password": true
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,18 @@
+Here's a prompt you can hand to Replit:
+
+Context: We made three file changes to fix tooltip behaviour but they aren't reflected in the running app.
+What was changed:
+
+components/Tooltip.tsx — fully replaced. The new version uses createPortal to render the tooltip into document.body instead of position: absolute inside a wrapper div. It also has auto-placement logic that measures available viewport space and picks the best side. The old version clipped inside overflow: hidden containers like the RAG panel.
+components/OverflowMenu.tsx — replaced the raw <button title="More actions"> trigger with <IconButton tooltip="More actions"> so the overflow menu button gets a consistent styled tooltip like every other icon button.
+components/rag/RAGChatPanel.tsx — removed a standalone Tooltip import and collapsed four <Tooltip><IconButton> double-wrap patterns into single <IconButton tooltip="..." tooltipPosition="bottom"> calls on the expand, new chat, history, and close buttons.
+
+What to look for / likely reasons it hasn't worked:
+
+Build cache not cleared — Next.js may be serving a cached build. Try stopping the dev server, deleting .next/, and restarting.
+File not actually saved — Check the actual file contents of components/Tooltip.tsx and confirm it contains createPortal and resolvePosition. If it still shows the old position: absolute wrapper approach, the write didn't persist.
+Hot reload didn't pick up Tooltip.tsx — Because Tooltip is imported by many components, sometimes the module graph doesn't fully invalidate. A full restart is more reliable than relying on HMR.
+IconButton still has tooltipPosition typed as 'top' | 'bottom' | 'left' | 'right' — The new Tooltip accepts 'auto' as a valid position but IconButton's prop type may not. Check components/IconButton.tsx and ensure tooltipPosition includes 'auto' in its union type, otherwise TypeScript may silently ignore it or cause a build error.
+OverflowMenu still importing the old way — Confirm components/OverflowMenu.tsx imports IconButton and no longer has the raw <button> element with title="More actions".
+
+The goal: Tooltips should render outside their scroll container (no clipping), auto-position below when near the top of the viewport, and the ··· overflow menu button on conversation cards should show a "More actions" tooltip on hover.

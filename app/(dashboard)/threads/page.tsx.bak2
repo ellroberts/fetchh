@@ -1,0 +1,1138 @@
+// app/(dashboard)/threads/page.tsx
+'use client'
+import { convertToMarkdown, convertToPlainText, triggerDownload, buildExportFilename } from '@/lib/export-utils'
+import type { ExportFormat } from '@/lib/export-utils'
+
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { createSupabaseClient } from '../../../lib/supabase'
+import { Button } from '@/components/Button'
+import { ThreadDrawer } from '@/components/ThreadDrawer'
+import { Alert } from '@/components/Alert'
+import { ClaimModal } from '@/components/ClaimModal'
+import { ClaimBanner } from '@/components/ClaimBanner'
+import { Toast } from '@/components/Toast'
+import { useClaimBanner } from '@/lib/useClaimBanner'
+import { ConversationCard, Conversation } from '@/components/ConversationCard'
+import { filterConversations } from '../../../lib/search'
+import { useRagPanel } from '../../../lib/rag-panel-context'
+import { DeleteConversationModal } from '@/components/DeleteConversationModal'
+import { RenameConversationModal } from '@/components/RenameConversationModal'
+import { FilterState } from '@/components/ThreadFilters'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { SelectionActionBar } from '@/components/SelectionActionBar'
+import { AddToProjectModal } from '@/components/AddToProjectModal'
+import { NewProjectModal } from '@/components/NewProjectModal'
+import { EmptyState } from '@/components/EmptyState'
+import { AddThreadModal } from '@/components/AddThreadModal'
+import { AddThreadSourceModal } from '@/components/AddThreadSourceModal'
+import { Checkbox } from '@/components/Checkbox'
+import { FolderOpen, SearchX, Plus } from 'lucide-react'
+import { TabPill } from '@/components/TabPill'
+
+interface Project {
+  id: string
+  name: string
+  description?: string | null
+  created_at: string
+  updated_at?: string
+}
+
+interface AnalysisResult {
+  summary: string
+  keyTopics: string[]
+  nextSteps: string[]
+  openQuestions: string[]
+  sentiment: 'positive' | 'neutral' | 'needs-attention'
+  progress: number
+}
+
+const ThreadsPage = () => {
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('list')
+  const [filters, setFilters] = useState<FilterState>({
+    platforms: [],
+    dateRange: 'all',
+    projectId: 'all',
+    topics: [],
+  })
+  const [searchQuery, setSearchQuery] = useState<string>('')
+  const [searchResults, setSearchResults] = useState<Conversation[] | null>(null)
+  const [isSearching, setIsSearching] = useState(false)
+
+  // Analysis states
+  const [analysisLoading, setAnalysisLoading] = useState<{ [key: string]: boolean }>({})
+  const [analyses, setAnalyses] = useState<{ [key: string]: AnalysisResult }>({})
+
+  // Project modal states
+  const [showProjectModal, setShowProjectModal] = useState(false)
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
+  const [newProjectDescription, setNewProjectDescription] = useState('')
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+
+  // RAG Multi-Chat Analysis states
+  const [selectedConversationIds, setSelectedConversationIds] = useState<Set<string>>(new Set())
+  const [threadDrawer, setThreadDrawer] = useState<{ conversationId: string; conversationTitle: string } | null>(null)
+  const [pinCounts, setPinCounts] = useState<Record<string, number>>({})
+  const [activeTab, setActiveTab] = useState<'threads' | 'highlights' | 'actions' | 'reminders'>('threads')
+  const [tabCounts, setTabCounts] = useState<{ highlights: number; actions: number; reminders: number }>({ highlights: 0, actions: 0, reminders: 0 })
+  const [generatingEmbeddings, setGeneratingEmbeddings] = useState(false)
+  const [embeddingProgress, setEmbeddingProgress] = useState<string | null>(null)
+
+  // Global RAG panel — single instance lives in AppLayout, we just call into it
+  const { openScoped, close } = useRagPanel()
+
+  // Claim conversations states
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [showAddMenu, setShowAddMenu] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [subscriptionTier, setSubscriptionTier] = useState<string>('free')
+  const [user, setUser] = useState<any>(null)
+
+  // Delete modal states
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [conversationToDelete, setConversationToDelete] = useState<Conversation | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  // Rename modal states
+  const [showRenameModal, setShowRenameModal] = useState(false)
+  const [conversationToRename, setConversationToRename] = useState<Conversation | null>(null)
+  const [isRenaming, setIsRenaming] = useState(false)
+
+  const router = useRouter()
+  const supabase = createSupabaseClient()
+
+  // Claim banner
+  const {
+  claimableConversations,
+  showClaimBanner,
+  showClaimModal,
+  claiming,
+  claimCheckLoading,
+  checkClaimableConversations,
+  resetBanner,
+  claimConversations,
+  setShowClaimModal,
+  claimBannerProps,
+  } = useClaimBanner({
+    onClaimSuccess: async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) await fetchConversations(user.id)
+    },
+    conversationCount: conversations.length,
+    subscriptionTier,
+  })
+
+  const [toastQueue, setToastQueue] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+  const showToast = (type: 'success' | 'error' | 'info', message: string) => {
+    setToastQueue({ type, message })
+    setTimeout(() => setToastQueue(null), 3500)
+  }
+
+  const normalizePlatform = (platform: string): 'claude' | 'chatgpt' | 'gemini' | 'other' => {
+    const normalized = platform.toLowerCase()
+    if (normalized.includes('claude')) return 'claude'
+    if (normalized.includes('chatgpt') || normalized.includes('openai')) return 'chatgpt'
+    if (normalized.includes('gemini') || normalized.includes('bard')) return 'gemini'
+    return 'other'
+  }
+
+  useEffect(() => {
+    initializeAndFetch()
+  }, [])
+
+  // Listen for drag-drop imports from AppLayout
+  useEffect(() => {
+    const handler = () => {
+      supabase.auth.getUser().then(({ data }: { data: any }) => {
+        if (data.user) fetchConversations(data.user.id)
+      })
+    }
+    window.addEventListener('threads-updated', handler)
+    return () => window.removeEventListener('threads-updated', handler)
+  }, [])
+
+
+  // Auto-refresh to check for completed embeddings
+  useEffect(() => {
+    const hasProcessing = conversations.some(conv => !conv.has_embeddings && !conv.locked)
+
+    if (hasProcessing) {
+      const interval = setInterval(async () => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data } = await supabase
+            .from('conversations')
+            .select('id, created_at, title, content, source, user_id, tags, summary, quick_summary, platform, message_count, project_id, has_embeddings, last_embedded_at')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+          if (data) setConversations(data)
+        }
+      }, 5000)
+      return () => clearInterval(interval)
+    }
+  }, [conversations, supabase])
+
+  // Hybrid search — debounced, hits API after 400ms
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults(null)
+      return
+    }
+    const timer = setTimeout(async () => {
+      setIsSearching(true)
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`)
+        const { results } = await res.json()
+        setSearchResults(results || [])
+      } catch (e) {
+        console.error('Search failed:', e)
+        setSearchResults(null)
+      } finally {
+        setIsSearching(false)
+      }
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  const initializeAndFetch = async () => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError) throw userError
+      if (!user) return
+      setUser(user)
+
+      // Fetch subscription tier
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('subscription_tier')
+        .eq('id', user.id)
+        .single()
+      const tier = profile?.subscription_tier ?? 'free'
+      if (profile?.subscription_tier) setSubscriptionTier(tier)
+
+      await fetchConversations(user.id, tier)
+      await fetchPinCounts(user.id)
+      await fetchTabCounts(user.id)
+      await fetchProjects()
+      await checkClaimableConversations()
+    } catch (error: any) {
+      setError(error.message || 'Failed to initialize')
+      setLoading(false)
+    }
+  }
+
+  const fetchTabCounts = useCallback(async (userId: string) => {
+    try {
+      const [{ count: hCount }, { count: aCount }, { count: rCount }] = await Promise.all([
+        supabase.from('highlights').select('*', { count: 'exact', head: true })
+          .eq('user_id', userId).eq('is_archived', false).is('project_id', null),
+        supabase.from('action_items').select('*', { count: 'exact', head: true })
+          .eq('user_id', userId).is('project_id', null),
+        supabase.from('reminder_items').select('*', { count: 'exact', head: true })
+          .eq('user_id', userId).is('project_id', null),
+      ])
+      setTabCounts({ highlights: hCount ?? 0, actions: aCount ?? 0, reminders: rCount ?? 0 })
+    } catch (err) {
+      console.error('Error fetching tab counts:', err)
+    }
+  }, [])
+
+  const fetchPinCounts = useCallback(async (userId: string) => {
+    try {
+      const [{ data: highlightData }, { data: actionData }, { data: reminderData }] = await Promise.all([
+        supabase.from('highlights').select('conversation_id').eq('user_id', userId).eq('is_archived', false),
+        supabase.from('action_items').select('source_conversation_ids').eq('user_id', userId),
+        supabase.from('reminder_items').select('source_conversation_ids').eq('user_id', userId),
+      ])
+      const counts: Record<string, number> = {}
+      // highlights are keyed by conversation_id directly
+      if (highlightData) {
+        highlightData.forEach((r: any) => {
+          if (r.conversation_id) counts[r.conversation_id] = (counts[r.conversation_id] || 0) + 1
+        })
+      }
+      const addCounts = (rows: any[] | null) => {
+        if (!rows) return
+        rows.forEach(r => {
+          if (Array.isArray(r.source_conversation_ids)) {
+            r.source_conversation_ids.forEach((id: string) => {
+              counts[id] = (counts[id] || 0) + 1
+            })
+          }
+        })
+      }
+      addCounts(actionData)
+      addCounts(reminderData)
+      setPinCounts(counts)
+    } catch (err) {
+      console.error('Error fetching pin counts:', err)
+    }
+  }, [])
+  // Refresh pin counts when a new insight/action/reminder is saved
+  useEffect(() => {
+    const handler = () => {
+      supabase.auth.getUser().then(({ data }: { data: any }) => {
+        if (data.user) fetchPinCounts(data.user.id)
+      })
+    }
+    window.addEventListener('threadcub:insight-saved', handler)
+    window.addEventListener('threadcub:action-item-added', handler)
+    window.addEventListener('threadcub:reminder-item-added', handler)
+    return () => {
+      window.removeEventListener('threadcub:insight-saved', handler)
+      window.removeEventListener('threadcub:action-item-added', handler)
+      window.removeEventListener('threadcub:reminder-item-added', handler)
+    }
+  }, [fetchPinCounts])
+
+  useEffect(() => {
+    const handler = () => {
+      supabase.auth.getUser().then(({ data }: { data: any }) => {
+        if (data.user) fetchTabCounts(data.user.id)
+      })
+    }
+    window.addEventListener('threadcub:insight-saved', handler)
+    window.addEventListener('threadcub:action-item-added', handler)
+    window.addEventListener('threadcub:reminder-item-added', handler)
+    return () => {
+      window.removeEventListener('threadcub:insight-saved', handler)
+      window.removeEventListener('threadcub:action-item-added', handler)
+      window.removeEventListener('threadcub:reminder-item-added', handler)
+    }
+  }, [fetchTabCounts])
+
+  const fetchConversations = async (userId: string, tier: string = subscriptionTier) => {
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('id, created_at, title, content, source, user_id, tags, summary, quick_summary, platform, message_count, project_id, has_embeddings, last_embedded_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      const planLimits: Record<string, number> = { free: 10, starter: 50, pro: 200, unlimited: Infinity }
+      const limit = planLimits[tier] ?? 10
+      const annotated = (data || []).map((conv: any, index: number) => ({ ...conv, locked: index >= limit }))
+      setConversations(annotated)
+    } catch (error: any) {
+      setError(error.message || 'Failed to fetch conversations')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('subscription_tier')
+    .eq('id', user.id)
+    .single()
+  const tier = profile?.subscription_tier ?? 'free'
+  if (profile?.subscription_tier) setSubscriptionTier(tier)
+  await fetchConversations(user.id, tier)
+  sessionStorage.removeItem('claim_banner_dismissed')
+  resetBanner()
+  await checkClaimableConversations()
+}
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const fetchProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (!error && data) setProjects(data)
+    } catch (error: any) {
+      console.error('Error fetching projects:', error)
+    }
+  }
+
+  const analyzeConversation = async (conversationId: string) => {
+    setAnalysisLoading(prev => ({ ...prev, [conversationId]: true }))
+    try {
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      const analysis: AnalysisResult = {
+        summary: `Analysis of this conversation: This conversation covers key topics and shows positive progress.`,
+        keyTopics: ['Main Topic', 'Secondary Topic', 'Action Items'],
+        nextSteps: ['Follow up on discussed points', 'Implement suggestions', 'Schedule review'],
+        openQuestions: ['What are the priorities?', 'Timeline for implementation?'],
+        sentiment: 'positive',
+        progress: 75
+      }
+      setAnalyses(prev => ({ ...prev, [conversationId]: analysis }))
+      alert(`Analysis complete\n\n${analysis.summary}`)
+    } catch (error) {
+      alert('Failed to analyze conversation. Please try again.')
+    } finally {
+      setAnalysisLoading(prev => ({ ...prev, [conversationId]: false }))
+    }
+  }
+
+  const continueConversation = (conversation: Conversation) => {
+    router.push(`/threads/${conversation.id}?mode=continue`)
+  }
+
+  const handleViewDetails = (conversationId: string) => {
+    const conv = conversations.find(c => c.id === conversationId)
+    setThreadDrawer({ conversationId, conversationTitle: conv?.title || 'Thread' })
+  }
+
+  const downloadConversation = (conversation: Conversation, format: ExportFormat = 'json') => {
+    const parsed = typeof conversation.content === 'string'
+      ? (() => { try { return JSON.parse(conversation.content) } catch { return {} } })()
+      : (conversation.content || {})
+    const exportData = {
+      title: conversation.title,
+      platform: conversation.platform || conversation.source || 'unknown',
+      exportDate: new Date().toISOString(),
+      message_count: conversation.message_count ?? 0,
+      tags: typeof conversation.tags === 'string' ? conversation.tags.split(',').map(t => t.trim()).filter(Boolean) : (conversation.tags ?? null),
+      url: conversation.url || conversation.metadata?.source_url || null,
+      summary: conversation.summary
+        ? conversation.summary.replace(/^>\s*/gm, '').replace(/^\s*[\$#~].*$/gm, '').trim() || null
+        : null,
+      messages: parsed.messages || []
+    }
+    const filename = buildExportFilename(conversation.title, format)
+    if (format === 'json') {
+      triggerDownload(JSON.stringify(exportData, null, 2), filename, 'application/json')
+    } else if (format === 'markdown') {
+      triggerDownload(convertToMarkdown(exportData), filename, 'text/markdown')
+    } else {
+      triggerDownload(convertToPlainText(exportData), filename, 'text/plain')
+    }
+  }
+    const renameConversation = (conversation: Conversation) => {
+    setConversationToRename(conversation)
+    setShowRenameModal(true)
+  }
+
+  const confirmRenameConversation = async (newTitle: string) => {
+    if (!conversationToRename) return
+    setIsRenaming(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const { error } = await supabase
+        .from('conversations')
+        .update({ title: newTitle })
+        .eq('id', conversationToRename.id)
+      if (error) throw error
+      setConversations(prev =>
+        prev.map(c => c.id === conversationToRename.id ? { ...c, title: newTitle } : c)
+      )
+    } catch (error) {
+      console.error('Error renaming conversation:', error)
+    } finally {
+      setIsRenaming(false)
+      setShowRenameModal(false)
+      setConversationToRename(null)
+    }
+  }
+
+  const deleteConversation = async (conversation: Conversation) => {
+    setConversationToDelete(conversation)
+    setShowDeleteModal(true)
+  }
+
+  const confirmDeleteConversation = async () => {
+    if (!conversationToDelete) return
+    setIsDeleting(true)
+
+    const idsToDelete = selectedConversationIds.size > 1
+      ? Array.from(selectedConversationIds)
+      : [conversationToDelete.id]
+
+    const deletedProjectId = conversationToDelete.project_id ?? null
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        console.error('No active session')
+        return
+      }
+
+      for (const id of idsToDelete) {
+        const response = await fetch(`/api/conversations/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        })
+        if (!response.ok) {
+          // Safely parse error body — might be HTML if the route crashed
+          const contentType = response.headers.get('content-type') || ''
+          const errMsg = contentType.includes('application/json')
+            ? (await response.json()).error
+            : `HTTP ${response.status}`
+          console.error('Error deleting conversation:', errMsg)
+        }
+      }
+
+      setConversations(prev => prev.filter(c => !idsToDelete.includes(c.id)))
+      setSelectedConversationIds(new Set())
+
+      // Trigger storyline update on the project the thread belonged to
+      if (deletedProjectId) {
+        triggerStorylineUpdate(deletedProjectId, 'thread_deleted')
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error)
+    } finally {
+      setIsDeleting(false)
+      setShowDeleteModal(false)
+      setConversationToDelete(null)
+    }
+  }
+
+  const triggerStorylineUpdate = async (
+    projectId: string,
+    action: 'thread_added' | 'thread_removed' | 'thread_deleted' | 'thread_moved',
+    previousProjectId?: string
+  ) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      await fetch(`/api/storyline/${projectId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ action, previousProjectId }),
+      })
+      // Fire-and-forget — 202 response, job runs in background
+    } catch (err) {
+      // Never surface storyline errors to the user
+      console.error('Storyline trigger failed (non-critical):', err)
+    }
+  }
+
+  const createAndAssignProject = async () => {
+    if (!newProjectName.trim()) return
+    const newId = await createProjectInline(newProjectName.trim())
+    if (!newId) return
+    const idsToUpdate = Array.from(selectedConversationIds)
+    if (idsToUpdate.length > 0) {
+      await supabase.from('conversations').update({ project_id: newId }).in('id', idsToUpdate)
+      setConversations(prev => prev.map(c => idsToUpdate.includes(c.id) ? { ...c, project_id: newId } : c))
+      setSelectedConversationIds(new Set())
+      triggerStorylineUpdate(newId, 'thread_added')
+    }
+    setNewProjectName('')
+    setNewProjectDescription('')
+    setShowNewProjectModal(false)
+  }
+
+  const createProjectInline = async (name: string): Promise<string | null> => {
+    const user = (await supabase.auth.getUser()).data.user
+    if (!user) return null
+    const { data, error } = await supabase
+      .from('projects')
+      .insert([{ name, user_id: user.id }])
+      .select()
+      .single()
+    if (error || !data) return null
+    setProjects(prev => [...prev, data])
+    return data.id
+  }
+
+  const openAddToProjectModal = (conversation: Conversation) => {
+    setSelectedConversation(conversation)
+    setShowProjectModal(true)
+  }
+
+  const addToProject = async () => {
+    if (!selectedProjectId) return
+    const isBulk = selectedConversationIds.size > 1
+    const idsToUpdate = isBulk ? Array.from(selectedConversationIds) : (selectedConversation ? [selectedConversation.id] : [])
+    if (idsToUpdate.length === 0) return
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .update({ project_id: selectedProjectId })
+        .in('id', idsToUpdate)
+      if (!error) {
+        // Detect threads previously in a different project (move scenario)
+        const previousProjectIds = new Set(
+          conversations
+            .filter(c => idsToUpdate.includes(c.id) && c.project_id && c.project_id !== selectedProjectId)
+            .map(c => c.project_id as string)
+        )
+
+        setConversations(prev =>
+          prev.map(c => idsToUpdate.includes(c.id)
+            ? { ...c, project_id: selectedProjectId }
+            : c
+          )
+        )
+        setShowProjectModal(false)
+        setSelectedConversation(null)
+        setSelectedProjectId('')
+        if (isBulk) setSelectedConversationIds(new Set())
+
+        // Trigger storyline on destination project
+        const action = previousProjectIds.size > 0 ? 'thread_moved' : 'thread_added'
+        triggerStorylineUpdate(selectedProjectId, action)
+
+        // Trigger storyline on any projects threads were moved away from
+        previousProjectIds.forEach(prevId => {
+          triggerStorylineUpdate(prevId, 'thread_removed')
+        })
+      }
+    } catch (error) {
+      alert('Failed to add to project. Please try again.')
+    }
+  }
+
+  const toggleConversationSelection = (conversationId: string) => {
+    setSelectedConversationIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(conversationId)) {
+        newSet.delete(conversationId)
+      } else {
+        newSet.add(conversationId)
+      }
+      return newSet
+    })
+  }
+
+  const handleBulkAskCoda = () => {
+  const titles = new Map<string, string>()
+  conversations.forEach(conv => titles.set(conv.id, conv.title))
+  openScoped(Array.from(selectedConversationIds), titles)
+  setSelectedConversationIds(new Set())
+}
+
+const handleBulkAddToProject = () => {
+  if (selectedConversationIds.size === 0) return
+  if (projects.length === 0) {
+    setShowNewProjectModal(true)
+    return
+  }
+  const firstId = Array.from(selectedConversationIds)[0]
+  const conv = conversations.find(c => c.id === firstId)
+  if (conv) openAddToProjectModal(conv)
+}
+
+const handleBulkDownload = (format: ExportFormat = 'json') => {
+  Array.from(selectedConversationIds).forEach(id => {
+    const conv = conversations.find(c => c.id === id)
+    if (conv) downloadConversation(conv, format)
+  })
+}
+
+const handleBulkDelete = () => {
+  if (selectedConversationIds.size === 0) return
+  const firstId = Array.from(selectedConversationIds)[0]
+  const conv = conversations.find(c => c.id === firstId)
+  if (conv) {
+    setConversationToDelete(conv)
+    setShowDeleteModal(true)
+  }
+}
+
+const clearSelection = () => {
+  setSelectedConversationIds(new Set())
+  close()
+}
+
+  const generateEmbeddingsForIds = async (ids: string[]): Promise<boolean> => {
+    const needsEmbedding = ids.filter(id => {
+      const conv = conversations.find(c => c.id === id)
+      return !conv?.has_embeddings
+    })
+
+    if (needsEmbedding.length === 0) return true
+
+    setGeneratingEmbeddings(true)
+    setEmbeddingProgress(`Indexing ${needsEmbedding.length} conversation${needsEmbedding.length > 1 ? 's' : ''} for analysis...`)
+
+    try {
+      for (let i = 0; i < needsEmbedding.length; i++) {
+        const id = needsEmbedding[i]
+        const conv = conversations.find(c => c.id === id)
+        setEmbeddingProgress(`Indexing "${conv?.title || 'conversation'}" (${i + 1}/${needsEmbedding.length})...`)
+
+        const response = await fetch('/api/embeddings/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversation_id: id }),
+        })
+
+        if (!response.ok) {
+          console.error(`Failed to generate embeddings for ${id}`)
+        }
+      }
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) await fetchConversations(user.id)
+
+      return true
+    } catch (error) {
+      console.error('Error generating embeddings:', error)
+      return false
+    } finally {
+      setGeneratingEmbeddings(false)
+      setEmbeddingProgress(null)
+    }
+  }
+
+  const readyConversationsCount = conversations.filter(c => c.has_embeddings && !c.locked).length
+  const selectedReadyCount = Array.from(selectedConversationIds).filter(id => {
+    const conv = conversations.find(c => c.id === id)
+    return conv?.has_embeddings
+  }).length
+
+  const getFilteredConversations = () => {
+    if (searchResults !== null) return searchResults
+
+    let filtered = conversations
+
+    if (filters.platforms.length > 0) {
+      filtered = filtered.filter(c => {
+        const p = (c.platform || c.source || '').toLowerCase()
+        return filters.platforms.some(fp => p.includes(fp))
+      })
+    }
+
+    if (filters.dateRange !== 'all') {
+      const now = new Date()
+      const startOf = (unit: 'day' | 'week' | 'month') => {
+        const d = new Date(now)
+        if (unit === 'day') { d.setHours(0,0,0,0) }
+        else if (unit === 'week') { d.setDate(d.getDate() - d.getDay()); d.setHours(0,0,0,0) }
+        else if (unit === 'month') { d.setDate(1); d.setHours(0,0,0,0) }
+        return d
+      }
+      const cutoff = filters.dateRange === 'today' ? startOf('day')
+        : filters.dateRange === 'week' ? startOf('week')
+        : startOf('month')
+      filtered = filtered.filter(c => new Date(c.created_at) >= cutoff)
+    }
+
+    if (filters.projectId === 'none') filtered = filtered.filter(c => !c.project_id)
+    else if (filters.projectId !== 'all') filtered = filtered.filter(c => c.project_id === filters.projectId)
+
+    if (filters.topics.length > 0) {
+      filtered = filtered.filter(c => {
+        const tags = c.tags
+        if (!tags) return false
+        const arr: string[] = Array.isArray(tags) ? tags : (typeof tags === 'string' ? (() => { try { return JSON.parse(tags) } catch { return [] } })() : [])
+        return filters.topics.some(t => arr.includes(t))
+      })
+    }
+
+    return filterConversations(filtered, searchQuery)
+  }
+
+  const filteredConversations = getFilteredConversations()
+  const allSelected = filteredConversations.length > 0 && filteredConversations.every(c => selectedConversationIds.has(c.id))
+  const someSelected = filteredConversations.some(c => selectedConversationIds.has(c.id))
+  const [scrolled, setScrolled] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const selectAll = () => setSelectedConversationIds(new Set(filteredConversations.map(c => c.id)))
+  const clearAll = () => setSelectedConversationIds(new Set())
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {!threadDrawer && (
+        <div className="px-8 shrink-0" style={{
+          paddingTop: '32px',
+          position: 'relative',
+          zIndex: 1,
+          boxShadow: scrolled ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+          transition: 'box-shadow 200ms ease',
+        }}>
+          <PageHeader
+            title="Chats"
+            subtitle={`${conversations.length} thread${conversations.length !== 1 ? 's' : ''} across ${[...new Set(conversations.map(c => c.platform || c.source).filter(Boolean))].length} AI platform${[...new Set(conversations.map(c => c.platform || c.source).filter(Boolean))].length !== 1 ? 's' : ''}`}
+            showFilters
+            filters={filters}
+            filterProjects={projects}
+            filterConversations={conversations}
+            onFiltersChange={setFilters}
+            showViewToggle
+            viewMode={viewMode}
+            onViewModeChange={(mode) => setViewMode(mode as 'cards' | 'list')}
+            showRefresh
+            isRefreshing={refreshing}
+            onRefresh={handleRefresh}
+            tabs={
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <TabPill
+                  label={`Threads (${conversations.length})`}
+                  selected={activeTab === 'threads'}
+                  onClick={() => setActiveTab('threads')}
+                />
+                <TabPill
+                  label={`Highlights (${tabCounts.highlights})`}
+                  selected={activeTab === 'highlights'}
+                  onClick={() => setActiveTab('highlights')}
+                />
+                <TabPill
+                  label={`Actions (${tabCounts.actions})`}
+                  selected={activeTab === 'actions'}
+                  onClick={() => setActiveTab('actions')}
+                />
+                <TabPill
+                  label={`Reminders (${tabCounts.reminders})`}
+                  selected={activeTab === 'reminders'}
+                  onClick={() => setActiveTab('reminders')}
+                />
+              </div>
+            }
+          />
+        </div>
+      )}
+
+        {threadDrawer ? (
+          <ThreadDrawer
+            pageTitle="Chats"
+            conversationId={threadDrawer.conversationId}
+            conversationTitle={threadDrawer.conversationTitle}
+            highlightText=""
+            onClose={() => { setThreadDrawer(null); setScrolled(false) }}
+          />
+        ) : (
+        <div
+          ref={scrollRef}
+          onScroll={() => setScrolled((scrollRef.current?.scrollTop ?? 0) > 0)}
+          className="flex-1 overflow-auto px-8 pb-24"
+          style={{ paddingTop: '24px' }}
+        >
+
+        {activeTab === 'threads' && (<>
+        {/* Claim Banner — only show when threads already exist */}
+        {showClaimBanner && conversations.length > 0 && (
+          <ClaimBanner
+            {...claimBannerProps}
+            style={{ marginBottom: 'var(--spacing-4)' }}
+          />
+        )}
+
+        {/* Select all row */}
+        {filteredConversations.length > 0 && (
+          <Checkbox
+            label="Select all"
+            checked={allSelected}
+            indeterminate={someSelected && !allSelected}
+            onChange={(checked) => checked ? selectAll() : clearAll()}
+            style={{ marginBottom: 'var(--spacing-3)' }}
+          />
+        )}
+
+        {/* Embedding generation progress */}
+        {generatingEmbeddings && embeddingProgress && (
+          <div style={{ marginBottom: "var(--spacing-4)", backgroundColor: "var(--color-state-info-bg)", border: "1px solid var(--color-state-info-border)", borderRadius: "var(--border-radius-md)", padding: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 flex-shrink-0" style={{ borderColor: "var(--color-primary-500)" }} />
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-body)" }}>{embeddingProgress}</span>
+          </div>
+        )}
+
+        {/* Project Modal */}
+        {showNewProjectModal && (
+          <NewProjectModal
+            name={newProjectName}
+            description={newProjectDescription}
+            onChangeName={setNewProjectName}
+            onChangeDescription={setNewProjectDescription}
+            onConfirm={async () => { await createAndAssignProject() }}
+            onClose={() => { setShowNewProjectModal(false); setNewProjectName(''); setNewProjectDescription('') }}
+            threads={[]}
+          />
+        )}
+        {showProjectModal && (
+          <AddToProjectModal
+            conversationTitle={selectedConversation?.title ?? ''}
+            count={selectedConversationIds.size > 1 ? selectedConversationIds.size : 1}
+            projects={projects}
+            selectedProjectId={selectedProjectId}
+            onChangeProject={setSelectedProjectId}
+            onConfirm={addToProject}
+            onCreateProject={createProjectInline}
+            onClose={() => { setShowProjectModal(false); setSelectedConversation(null); setSelectedProjectId('') }}
+          />
+        )}
+
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span style={{ marginLeft: "8px", color: "var(--color-text-muted)" }}>Loading conversations...</span>
+          </div>
+        )}
+
+        {error && (
+          <Alert type="error" style={{ marginBottom: '1rem' }}>
+            <strong>Error</strong>
+            <p className="text-sm mt-1">{error}</p>
+          </Alert>
+        )}
+
+        {!loading && !claimCheckLoading && !error && getFilteredConversations().length === 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '60vh' }}>
+            {!searchQuery && filters.projectId === 'all' && filters.platforms.length === 0 && filters.dateRange === 'all' && filters.topics.length === 0 ? (
+              claimBannerProps.count > 0 ? (
+                <EmptyState
+                  size="page"
+                  icon={FolderOpen}
+                  iconColor="var(--color-accent-teal)"
+                  title="Nothing here yet..."
+                  subtitle="but you've got some chats saved in the cloud!"
+                  action={{ label: `Download all ${claimBannerProps.count}`, onClick: () => claimConversations(claimableConversations.map(c => c.id)), variant: 'primary' }}
+                  secondaryAction={{ label: 'Have a look first', onClick: () => setShowClaimModal(true), variant: 'tertiary' }}
+                />
+              ) : (
+                <EmptyState
+                  size="page"
+                  icon={FolderOpen}
+                  iconColor="var(--color-accent-teal)"
+                  title="It's so quiet here."
+                  subtitle="Send some chats from the extension, or drop one in from your computer."
+                  action={{ label: 'Add your first thread', onClick: () => fileInputRef.current?.click(), variant: 'primary' }}
+                />
+              )
+            ) : (
+              <EmptyState
+                size="page"
+                icon={SearchX}
+                iconColor="var(--color-icon-subtle)"
+                title="No results found"
+                subtitle="Try adjusting your search or filters"
+              />
+            )}
+          </div>
+        )}
+
+        {!loading && !error && getFilteredConversations().length > 0 && (
+          <>
+            {viewMode === 'cards' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {getFilteredConversations().filter(Boolean).map((conversation) => {
+                  const conv = { ...conversation, platform: conversation.platform !== 'unknown' ? conversation.platform : conversation.source }
+                  return (
+                    <ConversationCard
+                      key={conversation.id}
+                      conversation={conv}
+                      viewMode="card"
+                      selectable={true}
+                      isSelected={selectedConversationIds.has(conversation.id)}
+                      onSelect={() => toggleConversationSelection(conversation.id)}
+                      onViewDetails={handleViewDetails}
+                      onAddToProject={openAddToProjectModal}
+                      onRename={renameConversation}
+                      onDelete={deleteConversation}
+                      onDownload={downloadConversation}
+                      isAnalyzing={analysisLoading[conversation.id]}
+                      pinCount={pinCounts[conversation.id] || 0}
+                    />
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {getFilteredConversations().filter(Boolean).map((conversation) => {
+                  const conv = { ...conversation, platform: conversation.platform !== 'unknown' ? conversation.platform : conversation.source }
+                  return (
+                    <ConversationCard
+                      key={conversation.id}
+                      conversation={conv}
+                      viewMode="list"
+                      selectable={true}
+                      isSelected={selectedConversationIds.has(conversation.id)}
+                      onSelect={() => toggleConversationSelection(conversation.id)}
+                      onViewDetails={handleViewDetails}
+                      onAddToProject={openAddToProjectModal}
+                      onRename={renameConversation}
+                      onDelete={deleteConversation}
+                      onDownload={downloadConversation}
+                      isAnalyzing={analysisLoading[conversation.id]}
+                      pinCount={pinCounts[conversation.id] || 0}
+                    />
+                  )
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+      </>
+      )}
+
+      {activeTab === 'highlights' && (
+        <div className="flex-1 overflow-auto px-8 pb-24" style={{ paddingTop: '24px' }}>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>Highlights saved outside a project will appear here.</p>
+        </div>
+      )}
+      {activeTab === 'actions' && (
+        <div className="flex-1 overflow-auto px-8 pb-24" style={{ paddingTop: '24px' }}>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>Actions saved outside a project will appear here.</p>
+        </div>
+      )}
+      {activeTab === 'reminders' && (
+        <div className="flex-1 overflow-auto px-8 pb-24" style={{ paddingTop: '24px' }}>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>Reminders saved outside a project will appear here.</p>
+        </div>
+      )}
+      </div>
+        )}
+
+      {/* Claim Modal */}
+      {showClaimModal && (
+        <ClaimModal
+          conversations={claimableConversations}
+          onClaim={claimConversations}
+          onCancel={() => setShowClaimModal(false)}
+          claiming={claiming}
+        />
+      )}
+
+      {/* Delete Conversation Modal */}
+      {showRenameModal && conversationToRename && (
+        <RenameConversationModal
+          currentTitle={conversationToRename.title}
+          onSave={confirmRenameConversation}
+          onCancel={() => { setShowRenameModal(false); setConversationToRename(null) }}
+          saving={isRenaming}
+        />
+      )}
+      {showDeleteModal && conversationToDelete && (
+        <DeleteConversationModal
+          title={conversationToDelete.title}
+          count={selectedConversationIds.size > 1 ? selectedConversationIds.size : 1}
+          isDeleting={isDeleting}
+          onConfirm={confirmDeleteConversation}
+          onCancel={() => {
+            setShowDeleteModal(false)
+            setConversationToDelete(null)
+          }}
+        />
+      )}
+
+      {/* Hidden file input — outside guard so empty state can trigger it */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        multiple
+        style={{ display: 'none' }}
+        onChange={async (e) => {
+              const files = Array.from(e.target.files || [])
+              if (files.length === 0) return
+              e.target.value = ''
+              const { data: { user } } = await supabase.auth.getUser()
+              if (!user) return
+              let savedCount = 0
+              let dupCount = 0
+              for (const file of files) {
+                const text = await file.text()
+                let convs: any[] = []
+                if (file.name.endsWith('.json')) {
+                  const parsed = JSON.parse(text)
+                  convs = Array.isArray(parsed) ? parsed : [parsed]
+                } else {
+                  convs = [{ title: file.name.replace('.md', ''), content: {}, messages: [], platform: 'import', _filename: file.name }]
+                }
+                for (const conv of convs) {
+                  const platformRaw = (conv.platform || conv.source || '').toLowerCase()
+                  let platform = 'unknown'
+                  if (platformRaw.includes('claude')) platform = 'claude.ai'
+                  else if (platformRaw.includes('chatgpt') || platformRaw.includes('openai')) platform = 'chatgpt'
+                  else if (platformRaw.includes('gemini')) platform = 'gemini'
+                  else if (conv.platform) platform = conv.platform
+                  const now = new Date().toISOString()
+                  const messages = conv.messages || []
+                  const conversationData: any = {
+                    title: conv.title || 'Untitled Conversation',
+                    content: conv.content || {},
+                    source: conv.url || conv.source || platform,
+                    messages,
+                    message_count: Array.isArray(messages) ? messages.length : 0,
+                    created_at: conv.created_at || now,
+                    updated_at: now,
+                    platform,
+                    metadata: { original_filename: conv._filename || file.name, import_date: now },
+                    tags: [],
+                    user_id: user.id,
+                    session_id: null,
+                    project_id: null,
+                    summary: null,
+                  }
+                  const { data, error } = await supabase.from('conversations').insert([conversationData]).select()
+                  if (error?.code === '23505') { dupCount++; continue }
+                  if (error || !data?.[0]) continue
+                  savedCount++
+                  fetch('/api/embeddings/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ conversation_id: data[0].id }),
+                  })
+                }
+              }
+              fetchConversations(user.id)
+              if (savedCount > 0) showToast('success', `Imported ${savedCount} conversation${savedCount > 1 ? 's' : ''}`)
+              if (dupCount > 0) showToast('info', `${dupCount} duplicate${dupCount > 1 ? 's' : ''} skipped`)
+        }}
+      />
+      {/* ── Floating Add button ── */}
+      {conversations.length > 0 && !threadDrawer && (
+        <div style={{
+          position: 'fixed',
+          bottom: '40px',
+          left: 'calc(var(--sidebar-width, 280px) + 48px)',
+          transition: 'left 0.2s ease-in-out',
+          zIndex: 40,
+          filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))',
+          opacity: selectedConversationIds.size > 0 ? 0 : 1,
+          pointerEvents: selectedConversationIds.size > 0 ? 'none' : 'auto',
+        }}>
+          <Button
+            variant="primary"
+            onClick={() => setShowAddMenu(true)}
+          >
+            + Add
+          </Button>
+        </div>
+      )}
+
+      {/* Floating Selection Action Bar */}
+      {showAddMenu && (
+        <AddThreadSourceModal
+          onClose={() => setShowAddMenu(false)}
+          onFileUpload={() => fileInputRef.current?.click()}
+          onCloudDownload={() => setShowClaimModal(true)}
+        />
+      )}
+      <SelectionActionBar
+        selectedCount={selectedConversationIds.size}
+        onAskCoda={handleBulkAskCoda}
+        onAddToProject={handleBulkAddToProject}
+        onDownload={handleBulkDownload}
+        onDelete={handleBulkDelete}
+        onClear={clearSelection}
+      />
+      {/* Toast */}
+      {toastQueue && (
+        <Toast
+          type={toastQueue.type}
+          message={toastQueue.message}
+          onClose={() => setToastQueue(null)}
+        />
+      )}
+
+    </div>
+  )
+}
+
+export default ThreadsPage

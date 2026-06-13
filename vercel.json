@@ -1,0 +1,16 @@
+{
+  "functions": {
+    "app/api/analyze-thread/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/quick-summary/route.ts": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/cleanup-guest-conversations",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}
