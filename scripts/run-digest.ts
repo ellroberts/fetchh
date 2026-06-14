@@ -34,7 +34,7 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 function parseMdFile(mdPath: string): {
   dateStr: string
   recipientEmail: string
-  byChannel: Map<string, Array<{ videoTitle: string; card: string }>>
+  byChannel: Map<string, Array<{ videoTitle: string; videoId?: string; card: string }>>
 } {
   const raw = fs.readFileSync(mdPath, 'utf8')
   const lines = raw.split('\n')
