@@ -1414,6 +1414,118 @@ body.onboarding-active {
   width: fit-content;
 }
 
+/* ── Niche Digest landing page ── */
+.digest-page {
+  min-height: 100vh;
+  background: var(--color-surface-page);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-6);
+}
+
+.digest-card {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  padding: var(--spacing-10) var(--spacing-8);
+  width: 100%;
+  max-width: 480px;
+}
+
+.digest-title {
+  font-size: var(--font-size-3xl);
+  font-weight: 700;
+  color: var(--color-text-title);
+  margin-bottom: var(--spacing-3);
+}
+
+.digest-subtitle {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-8);
+  line-height: 1.5;
+}
+
+.digest-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.digest-channels-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: calc(var(--spacing-1) * -1);
+}
+
+.digest-label-text {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-body);
+}
+
+.digest-label-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.digest-channels-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.digest-channel-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.digest-remove-btn {
+  flex-shrink: 0;
+  width: var(--spacing-8);
+  height: var(--spacing-8);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.digest-remove-btn:hover {
+  background: var(--color-surface-overlay);
+  color: var(--color-text-body);
+}
+
+.digest-add-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-link);
+  cursor: pointer;
+  text-align: left;
+  width: fit-content;
+}
+
+.digest-add-btn:hover {
+  color: var(--color-text-link-hover);
+  text-decoration: underline;
+}
+
+.digest-error {
+  font-size: var(--font-size-sm);
+  color: var(--color-border-error);
+  margin: 0;
+}
+
 /* ── Auth page responsive ── */
 .auth-left {
    display: flex;
