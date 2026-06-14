@@ -38,19 +38,19 @@ export interface DigestResult {
   byChannel: Map<string, Array<{ videoTitle: string; videoId?: string; card: string }>>
 }
 
-interface VideoMeta {
+export interface VideoMeta {
   id: string
   title: string
   uploadDate: string | null
   channelName: string
 }
 
-type MetaResult =
+export type MetaResult =
   | { ok: true; meta: VideoMeta }
   | { ok: false; reason: 'not-found' }
   | { ok: false; reason: 'fetch-failed'; videoId: string; status: number }
 
-type TranscriptResult =
+export type TranscriptResult =
   | { ok: true; text: string }
   | { ok: false; reason: 'no-transcript' }
   | { ok: false; reason: 'fetch-failed'; status: number }
@@ -94,7 +94,7 @@ async function getChannelVideoIds(channelUrl: string): Promise<string[]> {
   return data.videoIds ?? []
 }
 
-async function getVideoMeta(videoId: string): Promise<MetaResult> {
+export async function getVideoMeta(videoId: string): Promise<MetaResult> {
   const res = await fetchWithRetry(`/youtube/video?id=${encodeURIComponent(videoId)}`)
   if (res.status === 404) return { ok: false, reason: 'not-found' }
   if (!res.ok) return { ok: false, reason: 'fetch-failed', videoId, status: res.status }
@@ -140,7 +140,7 @@ async function getRecentVideoMetas(
   return { recent, failed }
 }
 
-async function getTranscript(videoId: string): Promise<TranscriptResult> {
+export async function getTranscript(videoId: string): Promise<TranscriptResult> {
   const params = new URLSearchParams({ videoId, text: 'true' })
   const res = await fetchWithRetry(`/youtube/transcript?${params}`)
   if (res.status === 404) return { ok: false, reason: 'no-transcript' }
@@ -152,7 +152,7 @@ async function getTranscript(videoId: string): Promise<TranscriptResult> {
   return { ok: false, reason: 'no-transcript' }
 }
 
-async function extractWithClaude(
+export async function extractWithClaude(
   transcript: string,
   channelName: string,
   videoTitle: string,
