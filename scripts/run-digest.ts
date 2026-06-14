@@ -1,12 +1,9 @@
 #!/usr/bin/env tsx
 /**
  * run-digest.ts
- * Usage: npm run digest -- <email>
- *
- * Reads the digest_signups row for the given email, fetches the last 7 days
- * of videos from each channel via Supadata, extracts transcripts, runs the
- * v2 extraction prompt through Claude Sonnet, and writes a markdown digest
- * to output/digest-<email>-<date>.md.
+ * Usage:
+ *   npm run digest -- <email>       run pipeline for one signup
+ *   npm run digest -- --preview     render latest .md to output/preview.html
  */
 
 import * as fs from 'fs'
@@ -27,188 +24,118 @@ if (fs.existsSync(envPath)) {
 }
 
 import { createClient } from '@supabase/supabase-js'
-import { EXTRACTION_PROMPT } from '../lib/extraction-prompt'
-
-// ── Config ────────────────────────────────────────────────────────────────────
+import { runDigestForUser, buildEmailHtml } from '../lib/digest-pipeline'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY!
-const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY!
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
-const SUPADATA_BASE = 'https://api.supadata.ai/v1'
-const MODEL = 'claude-sonnet-4-20250514'
+// ── Preview mode ──────────────────────────────────────────────────────────────
 
-// Fetch up to this many recent video IDs per channel to look for last-7-days videos
-const CHANNEL_VIDEO_FETCH_LIMIT = 30
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+function parseMdFile(mdPath: string): {
+  dateStr: string
+  recipientEmail: string
+  byChannel: Map<string, Array<{ videoTitle: string; card: string }>>
+} {
+  const raw = fs.readFileSync(mdPath, 'utf8')
+  const lines = raw.split('\n')
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+  let dateStr = ''
+  let recipientEmail = ''
+  const byChannel = new Map<string, Array<{ videoTitle: string; card: string }>>()
 
-function supafetch(path: string, opts?: RequestInit) {
-  return fetch(`${SUPADATA_BASE}${path}`, {
-    ...opts,
-    headers: { 'x-api-key': SUPADATA_API_KEY, 'Content-Type': 'application/json', ...opts?.headers },
-  })
-}
+  let currentChannel = ''
+  let currentTitle = ''
+  let cardLines: string[] = []
+  let inCard = false
 
-async function getChannelVideoIds(channelUrl: string): Promise<string[]> {
-  const params = new URLSearchParams({
-    id: channelUrl,
-    limit: String(CHANNEL_VIDEO_FETCH_LIMIT),
-    type: 'video',
-  })
-  const res = await supafetch(`/youtube/channel/videos?${params}`)
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`channel/videos failed (${res.status}): ${body}`)
+  const flushCard = () => {
+    if (currentChannel && currentTitle && cardLines.length) {
+      if (!byChannel.has(currentChannel)) byChannel.set(currentChannel, [])
+      byChannel.get(currentChannel)!.push({
+        videoTitle: currentTitle,
+        card: cardLines.join('\n').trim(),
+      })
+    }
+    cardLines = []
+    inCard = false
   }
-  const data = await res.json() as { videoIds: string[]; shortIds: string[]; liveIds: string[] }
-  return data.videoIds ?? []
-}
 
-const RETRY_DELAYS_MS = [1000, 3000] // two retries: wait 1 s then 3 s
+  for (const line of lines) {
+    const dateMatch = line.match(/^# Niche Digest — (.+)/)
+    if (dateMatch) { dateStr = dateMatch[1]; continue }
 
-async function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
+    const emailMatch = line.match(/^\*\*For:\*\*\s+(.+?)\s*$/)
+    if (emailMatch) { recipientEmail = emailMatch[1]; continue }
 
-async function fetchWithRetry(url: string): Promise<Response> {
-  let lastRes: Response | undefined
-  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
-    if (attempt > 0) await sleep(RETRY_DELAYS_MS[attempt - 1])
-    const res = await supafetch(url)
-    if (res.ok || res.status === 404) return res   // 404 = genuinely missing, don't retry
-    lastRes = res
-  }
-  return lastRes!
-}
+    if (line.trim() === '---') { flushCard(); continue }
 
-interface VideoMeta {
-  id: string
-  title: string
-  uploadDate: string | null
-  channelName: string
-}
-
-type MetaResult =
-  | { ok: true; meta: VideoMeta }
-  | { ok: false; reason: 'not-found' }
-  | { ok: false; reason: 'fetch-failed'; videoId: string; status: number }
-
-async function getVideoMeta(videoId: string): Promise<MetaResult> {
-  const res = await fetchWithRetry(`/youtube/video?id=${encodeURIComponent(videoId)}`)
-  if (res.status === 404) return { ok: false, reason: 'not-found' }
-  if (!res.ok) return { ok: false, reason: 'fetch-failed', videoId, status: res.status }
-  const data = await res.json()
-  return {
-    ok: true,
-    meta: {
-      id: videoId,
-      title: data.title ?? videoId,
-      uploadDate: data.uploadDate ?? null,
-      channelName: data.channel?.name ?? 'Unknown channel',
-    },
-  }
-}
-
-// Walk videoIds newest-first, stop once we hit a video older than the cutoff.
-// Fetches sequentially (with a small pause between) to avoid rate-limit bursts.
-async function getRecentVideoMetas(videoIds: string[], cutoff: number): Promise<{
-  recent: VideoMeta[]
-  failed: Array<{ videoId: string; status: number }>
-}> {
-  const recent: VideoMeta[] = []
-  const failed: Array<{ videoId: string; status: number }> = []
-
-  for (let i = 0; i < videoIds.length; i++) {
-    if (i > 0) await sleep(300) // 300 ms between requests — well under rate limits
-    const result = await getVideoMeta(videoIds[i])
-
-    if (!result.ok) {
-      if (result.reason === 'fetch-failed') {
-        failed.push({ videoId: result.videoId, status: result.status })
-      }
-      // 'not-found' is genuinely absent — skip silently
+    if (line.startsWith('## ') && !inCard) {
+      flushCard()
+      currentChannel = line.slice(3).trim()
+      currentTitle = ''
       continue
     }
 
-    const { meta } = result
-    if (!meta.uploadDate) continue // no date, can't place it — skip
+    if (line.startsWith('### ') && !inCard) {
+      flushCard()
+      currentTitle = line.slice(4).trim()
+      inCard = true
+      continue
+    }
 
-    const uploadTime = new Date(meta.uploadDate).getTime()
-    if (uploadTime < cutoff) break // list is newest-first; everything after is older
-    recent.push(meta)
+    if (inCard) cardLines.push(line)
   }
 
-  return { recent, failed }
-}
-
-type TranscriptResult =
-  | { ok: true; text: string }
-  | { ok: false; reason: 'no-transcript' }
-  | { ok: false; reason: 'fetch-failed'; status: number }
-
-async function getTranscript(videoId: string): Promise<TranscriptResult> {
-  const params = new URLSearchParams({ videoId, text: 'true' })
-  const res = await fetchWithRetry(`/youtube/transcript?${params}`)
-  if (res.status === 404) return { ok: false, reason: 'no-transcript' }
-  if (!res.ok) return { ok: false, reason: 'fetch-failed', status: res.status }
-  const data = await res.json()
-  if (typeof data.content === 'string' && data.content.trim()) {
-    return { ok: true, text: data.content }
-  }
-  return { ok: false, reason: 'no-transcript' }
-}
-
-async function extractWithClaude(transcript: string, channelName: string, videoTitle: string): Promise<string> {
-  const userContent = `${EXTRACTION_PROMPT}\n\n---\n\nChannel: ${channelName}\nVideo: ${videoTitle}\n\nTranscript:\n${transcript}`
-
-  const res = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 2048,
-      messages: [{ role: 'user', content: userContent }],
-    }),
-  })
-
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`Anthropic API error (${res.status}): ${body}`)
-  }
-
-  const data = await res.json()
-  return data.content?.[0]?.text ?? ''
+  flushCard()
+  return { dateStr, recipientEmail, byChannel }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const email = process.argv[2]?.trim()
+  const args = process.argv.slice(2)
+
+  if (args[0] === '--preview') {
+    const outputDir = path.join(process.cwd(), 'output')
+    const mdFiles = fs.readdirSync(outputDir)
+      .filter(f => f.startsWith('digest-') && f.endsWith('.md'))
+      .sort().reverse()
+
+    if (mdFiles.length === 0) {
+      console.error('No digest .md files found in output/')
+      process.exit(1)
+    }
+
+    const mdPath = path.join(outputDir, mdFiles[0])
+    console.log(`Rendering preview from: ${mdPath}`)
+
+    const { dateStr, recipientEmail, byChannel } = parseMdFile(mdPath)
+    const html = buildEmailHtml(dateStr, recipientEmail, byChannel)
+    const previewPath = path.join(outputDir, 'preview.html')
+    fs.writeFileSync(previewPath, html, 'utf8')
+    console.log(`✅ Preview written to: ${previewPath}`)
+    console.log(`   Open with: open ${previewPath}`)
+    return
+  }
+
+  const email = args[0]?.trim()
   if (!email) {
     console.error('Usage: npm run digest -- <email>')
+    console.error('       npm run digest -- --preview')
     process.exit(1)
   }
 
   for (const [name, val] of [
     ['NEXT_PUBLIC_SUPABASE_URL', SUPABASE_URL],
     ['SUPABASE_SERVICE_ROLE_KEY', SUPABASE_SERVICE_KEY],
-    ['ANTHROPIC_API_KEY', ANTHROPIC_API_KEY],
-    ['SUPADATA_API_KEY', SUPADATA_API_KEY],
+    ['ANTHROPIC_API_KEY', process.env.ANTHROPIC_API_KEY],
+    ['SUPADATA_API_KEY', process.env.SUPADATA_API_KEY],
   ] as const) {
     if (!val) { console.error(`Missing env var: ${name}`); process.exit(1) }
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-  // 1. Read signup row
   const { data: signup, error } = await supabase
     .from('digest_signups')
     .select('email, channels')
@@ -230,93 +157,30 @@ async function main() {
 
   console.log(`\n▶ Digest for ${email} — ${channels.length} channel(s)\n`)
 
-  const cutoff = Date.now() - SEVEN_DAYS_MS
-  const cards: Array<{ channelUrl: string; channelName: string; videoTitle: string; card: string }> = []
+  const result = await runDigestForUser(email, channels, console.log)
 
-  // 2. Per channel: get videos, filter by date, fetch transcripts, extract
-  for (const channelUrl of channels) {
-    console.log(`Channel: ${channelUrl}`)
-
-    let videoIds: string[]
-    try {
-      videoIds = await getChannelVideoIds(channelUrl)
-    } catch (err) {
-      console.warn(`  ⚠ Could not fetch video list: ${(err as Error).message}`)
-      continue
-    }
-
-    console.log(`  ${videoIds.length} recent video IDs fetched`)
-
-    // Walk newest-first, stop at cutoff, fetch sequentially to avoid rate limits
-    const { recent: recentVideos, failed: metaFailed } = await getRecentVideoMetas(videoIds, cutoff)
-
-    for (const { videoId, status } of metaFailed) {
-      console.warn(`  ⚠ Metadata fetch failed for ${videoId} (HTTP ${status}) — skipped`)
-    }
-    console.log(`  ${recentVideos.length} video(s) in the last 7 days`)
-
-    if (recentVideos.length === 0 && metaFailed.length === 0) continue
-
-    for (const video of recentVideos) {
-      console.log(`  → "${video.title}"`)
-
-      const transcriptResult = await getTranscript(video.id)
-      if (!transcriptResult.ok) {
-        if (transcriptResult.reason === 'fetch-failed') {
-          console.warn(`    ⚠ Transcript fetch failed (HTTP ${transcriptResult.status}) — skipped`)
-        } else {
-          console.log(`    ⚠ No transcript available — skipped`)
-        }
-        continue
-      }
-      const transcript = transcriptResult.text
-
-      console.log(`    Transcript: ${transcript.length.toLocaleString()} chars — extracting…`)
-
-      let card: string
-      try {
-        card = await extractWithClaude(transcript, video.channelName, video.title)
-      } catch (err) {
-        console.warn(`    ⚠ Claude extraction failed: ${(err as Error).message}`)
-        continue
-      }
-
-      cards.push({ channelUrl, channelName: video.channelName, videoTitle: video.title, card })
-      console.log(`    ✓ Card extracted`)
-    }
-  }
-
-  if (cards.length === 0) {
+  if (!result) {
     console.log('\nNo cards generated — no transcribable videos in the last 7 days.')
     process.exit(0)
   }
 
-  // 3. Write output file
-  const dateStr = new Date().toISOString().slice(0, 10)
+  // Write markdown file to output/
   const safeEmail = email.replace(/[^a-zA-Z0-9._-]/g, '_')
   const outputDir = path.join(process.cwd(), 'output')
   fs.mkdirSync(outputDir, { recursive: true })
-  const outputPath = path.join(outputDir, `digest-${safeEmail}-${dateStr}.md`)
-
-  // Group cards by channel name
-  const byChannel = new Map<string, typeof cards>()
-  for (const c of cards) {
-    const key = c.channelName
-    if (!byChannel.has(key)) byChannel.set(key, [])
-    byChannel.get(key)!.push(c)
-  }
+  const outputPath = path.join(outputDir, `digest-${safeEmail}-${result.dateStr}.md`)
 
   const lines: string[] = [
-    `# Niche Digest — ${dateStr}`,
+    `# Niche Digest — ${result.dateStr}`,
     `**For:** ${email}  `,
     `**Period:** Last 7 days  `,
-    `**Videos processed:** ${cards.length}`,
+    `**Videos processed:** ${result.cards.length}`,
     '',
     '---',
     '',
   ]
 
-  for (const [channelName, channelCards] of byChannel) {
+  for (const [channelName, channelCards] of result.byChannel) {
     lines.push(`## ${channelName}`, '')
     for (const { videoTitle, card } of channelCards) {
       lines.push(`### ${videoTitle}`, '', card, '', '---', '')

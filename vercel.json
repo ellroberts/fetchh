@@ -5,12 +5,19 @@
     },
     "app/api/quick-summary/route.ts": {
       "maxDuration": 30
+    },
+    "app/api/cron/digest/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
     {
       "path": "/api/cron/cleanup-guest-conversations",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/digest",
+      "schedule": "0 8 * * 1"
     }
   ]
 }
