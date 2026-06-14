@@ -10,8 +10,6 @@ import { PinType } from '@/components/projects/PinInsightModal'
 import { SaveHighlightModal } from '@/components/SaveHighlightModal'
 import { AddActionModal } from '@/components/AddActionModal'
 import { AddReminderModal } from '@/components/AddReminderModal'
-import { UserBubble } from '@/components/rag/UserBubble'
-import { CodaBubble } from '@/components/rag/CodaBubble'
 import { TabPill } from '@/components/TabPill'
 import { IconButton } from '@/components/IconButton'
 import { Tooltip } from '@/components/Tooltip'
@@ -577,16 +575,9 @@ useEffect(() => {
                       outlineOffset: '-2px',
                     }}
                   >
-                    {msg.role === 'user' ? (
-                      <UserBubble content={msg.content} timestamp={msg.timestamp} />
-                    ) : (
-                      <CodaBubble
-                        content={msg.content}
-                        timestamp={msg.timestamp}
-                        msgIndex={index}
-                        savedHighlights={savedHighlights.filter(h => h.msgIndex === index)}
-                      />
-                    )}
+                    <div style={{ padding: '8px 0', color: msg.role === 'user' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', whiteSpace: 'pre-wrap' }}>
+                      {msg.content}
+                    </div>
                   </div>
                 )
               })}
