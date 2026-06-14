@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "export": "next export",
-    "digest": "dotenv -e .env.local -- tsx scripts/run-digest.ts"
+    "digest": "npx tsx scripts/run-digest.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.58.0",

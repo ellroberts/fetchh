@@ -9,9 +9,24 @@
  * to output/digest-<email>-<date>.md.
  */
 
-import { createClient } from '@supabase/supabase-js'
 import * as fs from 'fs'
 import * as path from 'path'
+
+// Load .env.local before anything else reads process.env
+const envPath = path.resolve(process.cwd(), '.env.local')
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq === -1) continue
+    const key = trimmed.slice(0, eq).trim()
+    const val = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
+    if (!(key in process.env)) process.env[key] = val
+  }
+}
+
+import { createClient } from '@supabase/supabase-js'
 import { EXTRACTION_PROMPT } from '../lib/extraction-prompt'
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -53,6 +68,23 @@ async function getChannelVideoIds(channelUrl: string): Promise<string[]> {
   return data.videoIds ?? []
 }
 
+const RETRY_DELAYS_MS = [1000, 3000] // two retries: wait 1 s then 3 s
+
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function fetchWithRetry(url: string): Promise<Response> {
+  let lastRes: Response | undefined
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    if (attempt > 0) await sleep(RETRY_DELAYS_MS[attempt - 1])
+    const res = await supafetch(url)
+    if (res.ok || res.status === 404) return res   // 404 = genuinely missing, don't retry
+    lastRes = res
+  }
+  return lastRes!
+}
+
 interface VideoMeta {
   id: string
   title: string
@@ -60,25 +92,74 @@ interface VideoMeta {
   channelName: string
 }
 
-async function getVideoMeta(videoId: string): Promise<VideoMeta | null> {
-  const res = await supafetch(`/youtube/video?id=${encodeURIComponent(videoId)}`)
-  if (!res.ok) return null
+type MetaResult =
+  | { ok: true; meta: VideoMeta }
+  | { ok: false; reason: 'not-found' }
+  | { ok: false; reason: 'fetch-failed'; videoId: string; status: number }
+
+async function getVideoMeta(videoId: string): Promise<MetaResult> {
+  const res = await fetchWithRetry(`/youtube/video?id=${encodeURIComponent(videoId)}`)
+  if (res.status === 404) return { ok: false, reason: 'not-found' }
+  if (!res.ok) return { ok: false, reason: 'fetch-failed', videoId, status: res.status }
   const data = await res.json()
   return {
-    id: videoId,
-    title: data.title ?? videoId,
-    uploadDate: data.uploadDate ?? null,
-    channelName: data.channel?.name ?? 'Unknown channel',
+    ok: true,
+    meta: {
+      id: videoId,
+      title: data.title ?? videoId,
+      uploadDate: data.uploadDate ?? null,
+      channelName: data.channel?.name ?? 'Unknown channel',
+    },
   }
 }
 
-async function getTranscript(videoId: string): Promise<string | null> {
+// Walk videoIds newest-first, stop once we hit a video older than the cutoff.
+// Fetches sequentially (with a small pause between) to avoid rate-limit bursts.
+async function getRecentVideoMetas(videoIds: string[], cutoff: number): Promise<{
+  recent: VideoMeta[]
+  failed: Array<{ videoId: string; status: number }>
+}> {
+  const recent: VideoMeta[] = []
+  const failed: Array<{ videoId: string; status: number }> = []
+
+  for (let i = 0; i < videoIds.length; i++) {
+    if (i > 0) await sleep(300) // 300 ms between requests — well under rate limits
+    const result = await getVideoMeta(videoIds[i])
+
+    if (!result.ok) {
+      if (result.reason === 'fetch-failed') {
+        failed.push({ videoId: result.videoId, status: result.status })
+      }
+      // 'not-found' is genuinely absent — skip silently
+      continue
+    }
+
+    const { meta } = result
+    if (!meta.uploadDate) continue // no date, can't place it — skip
+
+    const uploadTime = new Date(meta.uploadDate).getTime()
+    if (uploadTime < cutoff) break // list is newest-first; everything after is older
+    recent.push(meta)
+  }
+
+  return { recent, failed }
+}
+
+type TranscriptResult =
+  | { ok: true; text: string }
+  | { ok: false; reason: 'no-transcript' }
+  | { ok: false; reason: 'fetch-failed'; status: number }
+
+async function getTranscript(videoId: string): Promise<TranscriptResult> {
   const params = new URLSearchParams({ videoId, text: 'true' })
-  const res = await supafetch(`/youtube/transcript?${params}`)
-  if (!res.ok) return null
+  const res = await fetchWithRetry(`/youtube/transcript?${params}`)
+  if (res.status === 404) return { ok: false, reason: 'no-transcript' }
+  if (!res.ok) return { ok: false, reason: 'fetch-failed', status: res.status }
   const data = await res.json()
-  if (typeof data.content === 'string' && data.content.trim()) return data.content
-  return null
+  if (typeof data.content === 'string' && data.content.trim()) {
+    return { ok: true, text: data.content }
+  }
+  return { ok: false, reason: 'no-transcript' }
 }
 
 async function extractWithClaude(transcript: string, channelName: string, videoTitle: string): Promise<string> {
@@ -166,25 +247,29 @@ async function main() {
 
     console.log(`  ${videoIds.length} recent video IDs fetched`)
 
-    // Fetch metadata for all IDs in parallel, filter to last 7 days
-    const metas = await Promise.all(videoIds.map(getVideoMeta))
-    const recentVideos = metas.filter((m): m is VideoMeta => {
-      if (!m || !m.uploadDate) return false
-      return new Date(m.uploadDate).getTime() >= cutoff
-    })
+    // Walk newest-first, stop at cutoff, fetch sequentially to avoid rate limits
+    const { recent: recentVideos, failed: metaFailed } = await getRecentVideoMetas(videoIds, cutoff)
 
+    for (const { videoId, status } of metaFailed) {
+      console.warn(`  ⚠ Metadata fetch failed for ${videoId} (HTTP ${status}) — skipped`)
+    }
     console.log(`  ${recentVideos.length} video(s) in the last 7 days`)
 
-    if (recentVideos.length === 0) continue
+    if (recentVideos.length === 0 && metaFailed.length === 0) continue
 
     for (const video of recentVideos) {
       console.log(`  → "${video.title}"`)
 
-      const transcript = await getTranscript(video.id)
-      if (!transcript) {
-        console.log(`    ⚠ No transcript — skipping`)
+      const transcriptResult = await getTranscript(video.id)
+      if (!transcriptResult.ok) {
+        if (transcriptResult.reason === 'fetch-failed') {
+          console.warn(`    ⚠ Transcript fetch failed (HTTP ${transcriptResult.status}) — skipped`)
+        } else {
+          console.log(`    ⚠ No transcript available — skipped`)
+        }
         continue
       }
+      const transcript = transcriptResult.text
 
       console.log(`    Transcript: ${transcript.length.toLocaleString()} chars — extracting…`)
 
