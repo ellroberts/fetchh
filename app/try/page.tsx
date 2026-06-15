@@ -396,8 +396,8 @@ function Carousel({ cards }: { cards: CarouselCard[] }) {
         )}
       </div>
 
-      {/* Pagination dots — below the carousel */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 24 }}>
+      {/* Pagination dots — below the carousel, hidden when only one card */}
+      {cards.length > 1 && <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 24 }}>
         {cards.map((_, i) => (
           <button
             key={i}
@@ -415,7 +415,7 @@ function Carousel({ cards }: { cards: CarouselCard[] }) {
             }}
           />
         ))}
-      </div>
+      </div>}
     </div>
   )
 }
@@ -518,7 +518,7 @@ export default function TryPage() {
 
   if (status === 'done' && (result || isMock)) {
     const cleanedCardHtml = result?.cardHtml
-      .replace(/<p[^>]*>-{2,}<\/p>/gi, '')
+      .replace(/<p[^>]*>\s*-{2,}\s*<\/p>/gi, '')
       .replace(/<p[^>]*>RELEVANT_RESOURCES:[^<]*<\/p>/gi, '') ?? ''
     const fields = isMock ? MOCK_FIELDS : parseCardHtml(cleanedCardHtml)
     const thumbnailUrl = isMock
