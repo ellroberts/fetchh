@@ -327,27 +327,6 @@ function Carousel({ cards }: { cards: CarouselCard[] }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      {/* Pagination dots — above the carousel */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12 }}>
-        {cards.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => emblaApi?.scrollTo(i)}
-            aria-label={`Go to card ${i + 1}`}
-            style={{
-              width: 12,
-              height: 12,
-              borderRadius: '50%',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-              background: i === selectedIndex ? '#08B9B9' : '#C9C9C7',
-              transition: 'background 0.2s ease',
-            }}
-          />
-        ))}
-      </div>
-
       <div style={{ position: 'relative', width: '100%' }}>
         {/* Mask wrapper — fades peek cards toward the page edges */}
         <div style={{
@@ -414,6 +393,27 @@ function Carousel({ cards }: { cards: CarouselCard[] }) {
             <ArrowRight size={24} color="#6C74FB" />
           </button>
         )}
+      </div>
+
+      {/* Pagination dots — below the carousel */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 24 }}>
+        {cards.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => emblaApi?.scrollTo(i)}
+            aria-label={`Go to card ${i + 1}`}
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              background: i === selectedIndex ? '#08B9B9' : '#C9C9C7',
+              transition: 'background 0.2s ease',
+            }}
+          />
+        ))}
       </div>
     </div>
   )
