@@ -130,7 +130,8 @@ function fieldToCards(field: ParsedField): CarouselCard[] {
   // Single-text fields
   if (key === 'ai-relevance' || key === 'one-action-this-week' || key === 'worth-watching-in-full') {
     const text = bodyHtml.replace(/<[^>]+>/g, '').trim()
-    const title = KEY_TO_DISPLAY[key] ?? field.label
+    // 'one-action-this-week' has no specific title — the tab label already provides context
+    const title = key === 'one-action-this-week' ? '' : (KEY_TO_DISPLAY[key] ?? field.label)
     return text ? [{ title, body: text }] : []
   }
 
@@ -516,7 +517,10 @@ export default function TryPage() {
   // ── Results ────────────────────────────────────────────────────────────────
 
   if (status === 'done' && (result || isMock)) {
-    const fields = isMock ? MOCK_FIELDS : parseCardHtml(result!.cardHtml)
+    const cleanedCardHtml = result?.cardHtml
+      .replace(/<p[^>]*>-{2,}<\/p>/gi, '')
+      .replace(/<p[^>]*>RELEVANT_RESOURCES:[^<]*<\/p>/gi, '') ?? ''
+    const fields = isMock ? MOCK_FIELDS : parseCardHtml(cleanedCardHtml)
     const thumbnailUrl = isMock
       ? MOCK_META.thumbnailUrl
       : `https://img.youtube.com/vi/${result!.videoId}/maxresdefault.jpg`
