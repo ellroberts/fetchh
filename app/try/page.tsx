@@ -169,6 +169,16 @@ const MOCK_META = {
   watchUrl: 'https://www.youtube.com/watch?v=example',
   videoTitle: '$10,000 in a Week — Inflatable Movie Theatre Business',
   channelName: 'The Koerner Office',
+  relevantResources: [
+    { name: 'Alibaba', url: 'https://alibaba.com' },
+    { name: 'Amazon', url: 'https://amazon.com' },
+  ],
+}
+
+function parseRelevantResources(cardHtml: string): Array<{ name: string; url: string }> {
+  const match = cardHtml.match(/RELEVANT_RESOURCES:\s*(\[[\s\S]*?\])/)
+  if (!match) return []
+  try { return JSON.parse(match[1]) } catch { return [] }
 }
 
 function li(text: string) {
@@ -186,9 +196,9 @@ const MOCK_FIELDS: ParsedField[] = [
     key: 'techniques-worth-trying',
     label: 'Techniques worth trying',
     bodyHtml: [
-      li('Inflatable movie theater business model: Derek started with a $250–300 consumer inflatable screen from Amazon, evolved to a $3,500 commercial 20-foot screen from Alibaba.'),
-      li('Equipment breakdown: $1,100 projector, $3,000 for two JBL speakers, $3,500 for 20-foot commercial screen, total outdoor setup around $8,000–10,000.'),
-      li('LED dance floor expansion: $20,000 for 24x24 foot setup, charges $3,000 per rental, pays for itself after 6.67 rentals.'),
+      li('<strong>Inflatable movie theater business model</strong>: Derek started with a $250–300 consumer inflatable screen from Amazon, evolved to a $3,500 commercial 20-foot screen from Alibaba.'),
+      li('<strong>Equipment breakdown</strong>: $1,100 projector, $3,000 for two JBL speakers, $3,500 for 20-foot commercial screen, total outdoor setup around $8,000–10,000.'),
+      li('<strong>LED dance floor expansion</strong>: $20,000 for 24x24 foot setup, charges $3,000 per rental, pays for itself after 6.67 rentals.'),
     ].join(''),
     count: 3,
   },
@@ -196,21 +206,21 @@ const MOCK_FIELDS: ParsedField[] = [
     key: 'decision-relevant-facts',
     label: 'Decision relevant facts',
     bodyHtml: [
-      li('Top package $1,500. Indoor climate-controlled inflatable theater charges $1,700 per event.'),
-      li('LED floor comes in 2-foot panels — configure 8x8, 16x6, or 24x24.'),
+      li('<strong>Top package pricing</strong>: $1,500. Indoor climate-controlled inflatable theater charges $1,700 per event.'),
+      li('<strong>LED floor configuration</strong>: comes in 2-foot panels — configure 8x8, 16x6, or 24x24.'),
     ].join(''),
     count: 2,
   },
   {
     key: 'mental-models',
     label: 'Mental models',
-    bodyHtml: li('Upsell by environment: outdoor → indoor → premium add-ons each justify higher pricing.'),
+    bodyHtml: li('<strong>Upsell by environment</strong>: outdoor → indoor → premium add-ons each justify higher pricing.'),
     count: 1,
   },
   {
     key: 'things-to-skip',
     label: 'Things to skip',
-    bodyHtml: li("Skip the consumer-grade screen if you're serious — the $250 Amazon version won't hold up commercially."),
+    bodyHtml: li("<strong>Consumer-grade screen</strong>: skip if you're serious — the $250 Amazon version won't hold up commercially."),
     count: 1,
   },
   {
@@ -242,13 +252,14 @@ function EmblaCarouselCard({ card }: { card: CarouselCard }) {
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',
+      textAlign: 'center',
     }}>
       {card.title && (
-        <p style={{ margin: '0 0 16px', fontSize: 32, fontWeight: 700, color: '#111111', lineHeight: 1.2 }}>
+        <p style={{ margin: '0 0 16px', fontSize: 32, fontWeight: 700, color: '#111111', lineHeight: 1.2, textAlign: 'center' }}>
           {card.title}
         </p>
       )}
-      <p style={{ margin: 0, fontSize: 20, lineHeight: '32px', color: '#333333', whiteSpace: 'pre-wrap' }}>
+      <p style={{ margin: 0, fontSize: 20, lineHeight: '32px', color: '#333333', whiteSpace: 'pre-wrap', textAlign: 'center' }}>
         {card.body}
       </p>
     </div>
@@ -524,6 +535,7 @@ export default function TryPage() {
 
     const activeField = fieldMap.get(activeTab)
     const activeCards = activeField ? fieldToCards(activeField) : []
+    const relevantResources = isMock ? MOCK_META.relevantResources : parseRelevantResources(result!.cardHtml)
 
     return (
       <>
@@ -549,19 +561,35 @@ export default function TryPage() {
         </div>
 
         {/* Inspired? quick links */}
-        <div style={{ width: CARD_WIDTH, marginTop: 48, textAlign: 'center' }}>
-          <p style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 400, color: '#000' }}>
-            Inspired? Here&apos;s some quick links
-          </p>
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-            <button style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #E5E5E5', background: '#FFF', fontSize: 14, cursor: 'pointer' }}>
-              Placeholder
-            </button>
-            <button style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #E5E5E5', background: '#FFF', fontSize: 14, cursor: 'pointer' }}>
-              Placeholder
-            </button>
+        {relevantResources.length > 0 && (
+          <div style={{ width: CARD_WIDTH, marginTop: 48, textAlign: 'center' }}>
+            <p style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 400, color: '#000' }}>
+              Inspired? Here&apos;s some quick links
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {relevantResources.map((resource) => (
+                <a
+                  key={resource.name}
+                  href={resource.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 12,
+                    border: '1px solid #E5E5E5',
+                    background: '#FFFFFF',
+                    fontSize: 14,
+                    color: '#111111',
+                    textDecoration: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {resource.name}
+                </a>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Worth watching module */}
         {worthText && (

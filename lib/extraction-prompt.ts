@@ -23,4 +23,9 @@ Then extract these fields:
 
 7. Worth watching in full? — Yes or No, and one sentence why, including roughly where the useful part sits if it's buried (e.g. "dense content in the middle third").
 
-If a field has nothing relevant, write "Nothing notable." Don't pad it. Each transcript below is labelled with the channel name and video title. Process each one separately and use those labels as headings in your output.`
+If a field has nothing relevant, write "Nothing notable." Don't pad it. Each transcript below is labelled with the channel name and video title. Process each one separately and use those labels as headings in your output.
+
+Finally, after all fields, output a single line in this exact format:
+RELEVANT_RESOURCES: [{"name":"ResourceName","url":"https://example.com"}]
+
+List any specific tools, products, services, platforms, or companies mentioned in the video. Use the most likely homepage URL for each (e.g. claude.ai, amazon.com). If nothing specific is mentioned, output: RELEVANT_RESOURCES: []`
