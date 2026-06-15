@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import useEmblaCarousel from 'embla-carousel-react'
 import { Input } from '@/components/Input'
 import { Button } from '@/components/Button'
 
@@ -228,12 +229,11 @@ const MOCK_FIELDS: ParsedField[] = [
 const CARD_WIDTH = 600
 const CARD_RADIUS = 24
 const CARD_PADDING = 32
-const PEEK_SCALE = 0.8
-const PEEK_OPACITY = 0.5
-// Gap between active card edge and start of peeking card
-const PEEK_GAP = 24
+// Horizontal space each slide occupies in the Embla flex track.
+// Extra beyond CARD_WIDTH creates the gap between cards and allows peeking.
+const SLIDE_PADDING_X = 20 // padding on each side of the card inside its slide slot
 
-function CarouselCard({ card }: { card: CarouselCard }) {
+function EmblaCarouselCard({ card }: { card: CarouselCard }) {
   return (
     <div style={{ padding: CARD_PADDING }}>
       {card.title && (
@@ -248,32 +248,28 @@ function CarouselCard({ card }: { card: CarouselCard }) {
   )
 }
 
-function Carousel({
-  cards,
-  watchUrl,
-}: {
-  cards: CarouselCard[]
-  watchUrl: string
-}) {
-  const [activeIdx, setActiveIdx] = useState(0)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [containerWidth, setContainerWidth] = useState(0)
+function Carousel({ cards }: { cards: CarouselCard[] }) {
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    align: 'center',
+    containScroll: false,
+    loop: false,
+  })
+  const [selectedIndex, setSelectedIndex] = useState(0)
+
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return
+    setSelectedIndex(emblaApi.selectedScrollSnap())
+  }, [emblaApi])
 
   useEffect(() => {
-    setActiveIdx(0)
-  }, [cards])
+    if (!emblaApi) return
+    emblaApi.on('select', onSelect)
+    onSelect()
+    return () => { emblaApi.off('select', onSelect) }
+  }, [emblaApi, onSelect])
 
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const obs = new ResizeObserver(() => setContainerWidth(el.offsetWidth))
-    obs.observe(el)
-    setContainerWidth(el.offsetWidth)
-    return () => obs.disconnect()
-  }, [])
-
-  const canPrev = activeIdx > 0
-  const canNext = activeIdx < cards.length - 1
+  const canPrev = selectedIndex > 0
+  const canNext = selectedIndex < cards.length - 1
 
   if (cards.length === 0) {
     return (
@@ -293,86 +289,69 @@ function Carousel({
     )
   }
 
-  // How far the peek card is offset from the active card edge
-  const peekCardOffset = CARD_WIDTH + PEEK_GAP
+  const ARROW_STYLE: React.CSSProperties = {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    zIndex: 10,
+    width: 72,
+    height: 72,
+    borderRadius: '50%',
+    background: '#FFFFFF',
+    border: 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      {/* Carousel track — overflow visible so peek cards are visible */}
-      <div
-        ref={containerRef}
-        style={{
-          position: 'relative',
-          width: '100%',
-          // Height driven by active card; peek cards are the same element size
-          height: 'auto',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'flex-start',
-          overflow: 'visible',
-        }}
-      >
-        {/* Render prev peek, active, next peek */}
-        {cards.map((card, i) => {
-          const offset = i - activeIdx // -1=prev, 0=active, 1=next
-          if (Math.abs(offset) > 1) return null
-
-          const isActive = offset === 0
-          const translateX = offset * peekCardOffset
-          const scale = isActive ? 1 : PEEK_SCALE
-          const opacity = isActive ? 1 : PEEK_OPACITY
-
-          return (
-            <div
-              key={i}
-              onClick={!isActive ? () => setActiveIdx(i) : undefined}
-              style={{
-                position: isActive ? 'relative' : 'absolute',
-                top: 0,
-                left: isActive ? undefined : '50%',
-                width: CARD_WIDTH,
-                background: '#FFFFFF',
-                borderRadius: CARD_RADIUS,
-                transform: isActive
-                  ? undefined
-                  : `translateX(calc(-50% + ${translateX}px)) scale(${scale})`,
-                transformOrigin: offset < 0 ? 'right center' : 'left center',
-                opacity,
-                transition: 'transform 0.3s ease, opacity 0.3s ease',
-                cursor: isActive ? 'default' : 'pointer',
-                flexShrink: 0,
-                zIndex: isActive ? 2 : 1,
-                // Clip peek cards at page edge
-                overflow: 'hidden',
-              }}
-            >
-              <CarouselCard card={card} />
-            </div>
-          )
-        })}
+      <div style={{ position: 'relative', width: '100%' }}>
+        {/* Embla viewport — overflow:hidden clips the peek cards at the track boundary;
+            the page wrapper's overflow-x:hidden clips them at the screen edge */}
+        <div ref={emblaRef} style={{ overflow: 'hidden', width: '100%' }}>
+          <div style={{ display: 'flex' }}>
+            {cards.map((card, i) => {
+              const isActive = i === selectedIndex
+              return (
+                <div
+                  key={i}
+                  // Each slide occupies CARD_WIDTH + 2*SLIDE_PADDING_X in the track
+                  style={{
+                    flex: `0 0 ${CARD_WIDTH + SLIDE_PADDING_X * 2}px`,
+                    paddingLeft: SLIDE_PADDING_X,
+                    paddingRight: SLIDE_PADDING_X,
+                  }}
+                >
+                  {/* Inner card — scale and fade when not active */}
+                  <div
+                    style={{
+                      background: '#FFFFFF',
+                      borderRadius: CARD_RADIUS,
+                      transform: isActive ? 'scale(1)' : 'scale(0.8)',
+                      opacity: isActive ? 1 : 0.5,
+                      transition: 'transform 0.3s ease, opacity 0.3s ease',
+                      cursor: isActive ? 'default' : 'pointer',
+                      transformOrigin: 'center top',
+                    }}
+                    onClick={!isActive ? () => emblaApi?.scrollTo(i) : undefined}
+                  >
+                    <EmblaCarouselCard card={card} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
 
         {/* Left arrow */}
         {canPrev && (
           <button
-            onClick={() => setActiveIdx(activeIdx - 1)}
+            onClick={() => emblaApi?.scrollPrev()}
             aria-label="Previous"
-            style={{
-              position: 'absolute',
-              left: `calc(50% - ${CARD_WIDTH / 2}px - 36px - 20px)`,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              zIndex: 10,
-              width: 72,
-              height: 72,
-              borderRadius: '50%',
-              background: '#FFFFFF',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
-            }}
+            style={{ ...ARROW_STYLE, left: `calc(50% - ${CARD_WIDTH / 2}px - ${SLIDE_PADDING_X}px - 56px)` }}
           >
             <ChevronLeft size={20} color="#111" />
           </button>
@@ -381,25 +360,9 @@ function Carousel({
         {/* Right arrow */}
         {canNext && (
           <button
-            onClick={() => setActiveIdx(activeIdx + 1)}
+            onClick={() => emblaApi?.scrollNext()}
             aria-label="Next"
-            style={{
-              position: 'absolute',
-              left: `calc(50% + ${CARD_WIDTH / 2}px - 36px + 20px)`,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              zIndex: 10,
-              width: 72,
-              height: 72,
-              borderRadius: '50%',
-              background: '#FFFFFF',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
-            }}
+            style={{ ...ARROW_STYLE, left: `calc(50% + ${CARD_WIDTH / 2}px + ${SLIDE_PADDING_X}px - 16px)` }}
           >
             <ChevronRight size={20} color="#111" />
           </button>
@@ -411,7 +374,7 @@ function Carousel({
         {cards.map((_, i) => (
           <button
             key={i}
-            onClick={() => setActiveIdx(i)}
+            onClick={() => emblaApi?.scrollTo(i)}
             aria-label={`Go to card ${i + 1}`}
             style={{
               width: 16,
@@ -420,7 +383,7 @@ function Carousel({
               border: 'none',
               cursor: 'pointer',
               padding: 0,
-              background: i === activeIdx ? '#08B9B9' : '#5E5E5E',
+              background: i === selectedIndex ? '#08B9B9' : '#5E5E5E',
               transition: 'background 0.2s ease',
             }}
           />
@@ -439,6 +402,7 @@ const PAGE: React.CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   padding: '48px 16px 80px',
+  overflowX: 'hidden',
 }
 
 export default function TryPage() {
@@ -573,7 +537,7 @@ export default function TryPage() {
 
         {/* Carousel */}
         <div style={{ width: '100%', marginBottom: 0 }}>
-          <Carousel key={activeTab} cards={activeCards} watchUrl={watchUrl} />
+          <Carousel key={activeTab} cards={activeCards} />
         </div>
 
         {/* Worth watching module */}
