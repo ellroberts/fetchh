@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Input } from '@/components/Input'
 import { Button } from '@/components/Button'
 
@@ -60,6 +60,73 @@ const KEY_TO_DISPLAY: Record<string, string> = {
 
 const DEFAULT_EXPANDED = new Set(['ai-relevance', 'worth-watching-in-full'])
 
+// ── Mock fixture ──────────────────────────────────────────────────────────────
+
+const MOCK_META = {
+  thumbnailUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
+  youtubeUrl: 'https://www.youtube.com/watch?v=example',
+  // videoId used only for the FieldBody "Watch now" link
+  watchUrl: 'https://www.youtube.com/watch?v=example',
+}
+
+function li(text: string) {
+  return `<li>${text}</li>`
+}
+
+const MOCK_FIELDS: ParsedField[] = [
+  {
+    key: 'ai-relevance',
+    label: 'AI relevance',
+    bodyHtml: 'This is entirely about starting an inflatable movie theatre rental business with no mention of AI tools or workflows.',
+  },
+  {
+    key: 'tools-mentioned',
+    label: 'Tools mentioned',
+    bodyHtml: '',
+  },
+  {
+    key: 'techniques-worth-trying',
+    label: 'Techniques worth trying',
+    bodyHtml: [
+      li('Inflatable movie theater business model: Derek started with a $250–300 consumer inflatable screen from Amazon, evolved to a $3,500 commercial 20-foot screen from Alibaba.'),
+      li('Equipment breakdown: $1,100 projector, $3,000 for two JBL speakers, $3,500 for 20-foot commercial screen, total outdoor setup around $8,000–10,000.'),
+      li('LED dance floor expansion: $20,000 for 24x24 foot setup, charges $3,000 per rental, pays for itself after 6.67 rentals.'),
+    ].join(''),
+    count: 3,
+  },
+  {
+    key: 'decision-relevant-facts',
+    label: 'Decision relevant facts',
+    bodyHtml: [
+      li('Top package $1,500. Indoor climate-controlled inflatable theater charges $1,700 per event.'),
+      li('LED floor comes in 2-foot panels — configure 8x8, 16x6, or 24x24.'),
+    ].join(''),
+    count: 2,
+  },
+  {
+    key: 'mental-models',
+    label: 'Mental models',
+    bodyHtml: li('Upsell by environment: outdoor → indoor → premium add-ons each justify higher pricing.'),
+    count: 1,
+  },
+  {
+    key: 'things-to-skip',
+    label: 'Things to skip',
+    bodyHtml: li("Skip the consumer-grade screen if you're serious — the $250 Amazon version won't hold up commercially."),
+    count: 1,
+  },
+  {
+    key: 'one-action-this-week',
+    label: 'One action this week',
+    bodyHtml: 'Price out the $3,500 Alibaba screen and compare against your local event rental market rate.',
+  },
+  {
+    key: 'worth-watching-in-full',
+    label: 'Worth watching in full?',
+    bodyHtml: 'Yes — Derek provides specific numbers, equipment costs, pricing strategies, and evolution from accidental side hustle to $100k business across the full interview.',
+  },
+]
+
 // ── Parser ────────────────────────────────────────────────────────────────────
 
 function parseCardHtml(cardHtml: string): ParsedField[] {
@@ -116,7 +183,7 @@ function parseCardHtml(cardHtml: string): ParsedField[] {
 
 // ── Field body renderer ───────────────────────────────────────────────────────
 
-function FieldBody({ field, videoId }: { field: ParsedField; videoId: string }) {
+function FieldBody({ field, watchUrl }: { field: ParsedField; watchUrl: string }) {
   const { key, bodyHtml, count } = field
 
   // AI relevance — plain text stored in bodyHtml
@@ -190,7 +257,7 @@ function FieldBody({ field, videoId }: { field: ParsedField; videoId: string }) 
       ))}
       {key === 'worth-watching-in-full' && (
         <a
-          href={`https://www.youtube.com/watch?v=${videoId}`}
+          href={watchUrl}
           target="_blank"
           rel="noopener noreferrer"
           style={{ display: 'inline-block', marginTop: 12, fontSize: 14, color: '#2563EB', textDecoration: 'none' }}
@@ -210,12 +277,12 @@ function FieldCard({
   field,
   expanded,
   onToggle,
-  videoId,
+  watchUrl,
 }: {
   field: ParsedField
   expanded: boolean
   onToggle: () => void
-  videoId: string
+  watchUrl: string
 }) {
   return (
     <div
@@ -268,7 +335,7 @@ function FieldCard({
 
       {expanded && (
         <div style={{ marginTop: 12 }}>
-          <FieldBody field={field} videoId={videoId} />
+          <FieldBody field={field} watchUrl={watchUrl} />
         </div>
       )}
     </div>
@@ -297,6 +364,14 @@ export default function TryPage() {
   const [errorMsg, setErrorMsg] = useState('')
   const [result, setResult] = useState<ExtractionResult | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set(DEFAULT_EXPANDED))
+  const [isMock, setIsMock] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mock') === 'true') {
+      setIsMock(true)
+      setStatus('done')
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -344,17 +419,24 @@ export default function TryPage() {
   }
 
   // Results
-  if (status === 'done' && result) {
-    const fields = parseCardHtml(result.cardHtml)
-    const youtubeUrl = `https://www.youtube.com/watch?v=${result.videoId}`
+  if (status === 'done' && (result || isMock)) {
+    const fields = isMock ? MOCK_FIELDS : parseCardHtml(result!.cardHtml)
+    const thumbnailUrl = isMock
+      ? MOCK_META.thumbnailUrl
+      : `https://img.youtube.com/vi/${result!.videoId}/maxresdefault.jpg`
+    const youtubeUrl = isMock
+      ? MOCK_META.youtubeUrl
+      : `https://www.youtube.com/watch?v=${result!.videoId}`
+    const watchUrl = isMock ? MOCK_META.watchUrl : `https://www.youtube.com/watch?v=${result!.videoId}`
+    const videoTitle = isMock ? '$10,000 in a Week — Inflatable Movie Theatre Business' : result!.videoTitle
 
     return (
       <main style={PAGE}>
         <div style={COLUMN}>
           <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginBottom: 16 }}>
             <img
-              src={`https://img.youtube.com/vi/${result.videoId}/maxresdefault.jpg`}
-              alt={result.videoTitle}
+              src={thumbnailUrl}
+              alt={videoTitle}
               style={{ display: 'block', width: '100%', borderRadius: 12 }}
             />
           </a>
@@ -366,14 +448,14 @@ export default function TryPage() {
                 field={field}
                 expanded={expanded.has(field.key)}
                 onToggle={() => toggleField(field.key)}
-                videoId={result.videoId}
+                watchUrl={watchUrl}
               />
             ))}
           </div>
 
           <div style={{ marginTop: 24, textAlign: 'center' }}>
             <button
-              onClick={() => { setStatus('idle'); setResult(null) }}
+              onClick={() => { setStatus('idle'); setResult(null); setIsMock(false) }}
               style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#666', textDecoration: 'underline', padding: 0 }}
             >
               Try another video
