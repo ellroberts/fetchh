@@ -7,6 +7,10 @@ Before extracting, judge how relevant the video actually is to a designer buildi
 
 Put this label at the top of each card as "AI relevance: [Core/Partial/Minimal] — [one sentence why]". Never force a Minimal or Partial video through the AI lens or inflate a trivial tool mention into a workflow. If AI was used trivially (a few seconds, a clipboard hack), say so plainly in the tool entry.
 
+Formatting rules for list fields: every bullet must start with **Bold title** followed by a colon and the description. No single-asterisk italic markers. Plain double-asterisk bold only.
+
+When referring to the creator of the video, use their name (infer it from the Channel name provided) rather than "the creator" or "the presenter". For example, if the channel is "femke.design", refer to them as "Femke".
+
 Then extract these fields:
 
 1. Tools mentioned — any specific AI tools, apps, or products named, and what they were used for. Describe the real role honestly: if a tool was used for 15 seconds as a shortcut, say that, don't present it as a core workflow.

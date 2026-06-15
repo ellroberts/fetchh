@@ -120,8 +120,9 @@ function parseCardHtml(cardHtml: string): ParsedField[] {
 
 // Each "card" is one displayable item (one li, or the full body for non-list fields)
 interface CarouselCard {
-  title: string   // bold heading in the card
-  body: string    // plain text content
+  title: string    // bold heading in the card
+  body: string     // plain text content
+  url?: string     // optional link extracted from body text
 }
 
 function fieldToCards(field: ParsedField): CarouselCard[] {
@@ -129,7 +130,7 @@ function fieldToCards(field: ParsedField): CarouselCard[] {
 
   // Single-text fields
   if (key === 'ai-relevance' || key === 'one-action-this-week' || key === 'worth-watching-in-full') {
-    const text = bodyHtml.replace(/<[^>]+>/g, '').trim()
+    const text = bodyHtml.replace(/<[^>]+>/g, '').replace(/\*([^*\n]+)\*/g, '$1').replace(/\*/g, '').trim()
     // 'one-action-this-week' has no specific title — the tab label already provides context
     const title = key === 'one-action-this-week' ? '' : (KEY_TO_DISPLAY[key] ?? field.label)
     return text ? [{ title, body: text }] : []
@@ -140,23 +141,51 @@ function fieldToCards(field: ParsedField): CarouselCard[] {
   if (liMatches.length > 0) {
     return liMatches.map((match) => {
       const content = match[1]
+
+      // Primary: <strong>Title</strong>: body
       const boldMatch = content.match(/^<strong>([\s\S]*?)<\/strong>([\s\S]*)/)
       if (boldMatch) {
         const title = boldMatch[1].replace(/<[^>]+>/g, '').trim()
-        const body = boldMatch[2].replace(/^\s*(?:[—–-]|:)\s*/, '').replace(/<[^>]+>/g, '').trim()
+        const rawBody = boldMatch[2].replace(/^\s*(?:[—–-]|:)\s*/, '').replace(/<[^>]+>/g, '').trim()
+        const body = rawBody.replace(/\*([^*\n]+)\*/g, '$1').replace(/\*/g, '')
         return { title, body }
       }
-      return { title: '', body: content.replace(/<[^>]+>/g, '').trim() }
+
+      // Fallback: strip asterisks and detect any URLs before title extraction
+      const rawText = content.replace(/<[^>]+>/g, '').replace(/\*([^*\n]+)\*/g, '$1').replace(/\*/g, '').trim()
+      const urlMatch = rawText.match(/https?:\/\/[^\s)]+/)
+      const plainText = urlMatch ? rawText.replace(urlMatch[0], '').replace(/\s{2,}/g, ' ').trim() : rawText
+      const url = urlMatch?.[0]
+
+      // Fallback 1: "Title — body" em-dash pattern
+      const dashMatch = plainText.match(/^(.+?)\s*[—–]\s*(.+)/s)
+      if (dashMatch && dashMatch[1].length <= 80) {
+        return { title: dashMatch[1].trim(), body: dashMatch[2].trim(), url }
+      }
+
+      // Fallback 2: "Title: body" colon pattern (no parens/dashes before colon)
+      const colonMatch = plainText.match(/^([^:(—–\n]{3,50}):\s*(.+)/s)
+      if (colonMatch) {
+        return { title: colonMatch[1].trim(), body: colonMatch[2].trim(), url }
+      }
+
+      return { title: '', body: plainText, url }
     })
   }
 
   // Non-list, non-single-text fields (paragraphs)
   const paragraphs = bodyHtml
     .split('</p>')
-    .map((s) => s.replace(/<[^>]+>/g, '').trim())
+    .map((s) => s.replace(/<[^>]+>/g, '').replace(/\*([^*\n]+)\*/g, '$1').replace(/\*/g, '').trim())
     .filter(Boolean)
   if (paragraphs.length > 0) {
-    return [{ title: field.label, body: paragraphs.join('\n\n') }]
+    const fullText = paragraphs.join('\n\n')
+    // Try em-dash split for a more specific title than the generic field label
+    const dashMatch = fullText.match(/^(.+?)\s*[—–]\s*(.+)/s)
+    if (dashMatch && dashMatch[1].length <= 80) {
+      return [{ title: dashMatch[1].trim(), body: dashMatch[2].trim() }]
+    }
+    return [{ title: field.label, body: fullText }]
   }
 
   return []
@@ -253,6 +282,7 @@ function EmblaCarouselCard({ card }: { card: CarouselCard }) {
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',
+      alignItems: 'center',
       textAlign: 'center',
     }}>
       {card.title && (
@@ -263,6 +293,26 @@ function EmblaCarouselCard({ card }: { card: CarouselCard }) {
       <p style={{ margin: 0, fontSize: 20, lineHeight: '32px', color: '#333333', whiteSpace: 'pre-wrap', textAlign: 'center' }}>
         {card.body}
       </p>
+      {card.url && (
+        <a
+          href={card.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            marginTop: 24,
+            display: 'inline-block',
+            padding: '8px 16px',
+            borderRadius: 12,
+            border: '1px solid #E5E5E5',
+            background: '#FFFFFF',
+            fontSize: 14,
+            color: '#111111',
+            textDecoration: 'none',
+          }}
+        >
+          Open link →
+        </a>
+      )}
     </div>
   )
 }
@@ -538,7 +588,11 @@ export default function TryPage() {
       : ''
 
     const activeField = fieldMap.get(activeTab)
-    const activeCards = activeField ? fieldToCards(activeField) : []
+    const rawCards = activeField ? fieldToCards(activeField) : []
+    // For 'This week' cards that mention a download/description link, attach the video URL
+    const activeCards = activeTab === 'one-action-this-week'
+      ? rawCards.map(card => /download|description/i.test(card.body) ? { ...card, url: watchUrl } : card)
+      : rawCards
     const relevantResources = isMock ? MOCK_META.relevantResources : parseRelevantResources(result!.cardHtml)
 
     return (
