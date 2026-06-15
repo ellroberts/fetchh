@@ -142,7 +142,7 @@ function fieldToCards(field: ParsedField): CarouselCard[] {
       const boldMatch = content.match(/^<strong>([\s\S]*?)<\/strong>([\s\S]*)/)
       if (boldMatch) {
         const title = boldMatch[1].replace(/<[^>]+>/g, '').trim()
-        const body = boldMatch[2].replace(/^\s*[—–-]\s*/, '').replace(/<[^>]+>/g, '').trim()
+        const body = boldMatch[2].replace(/^\s*(?:[—–-]|:)\s*/, '').replace(/<[^>]+>/g, '').trim()
         return { title, body }
       }
       return { title: '', body: content.replace(/<[^>]+>/g, '').trim() }
@@ -168,6 +168,7 @@ const MOCK_META = {
   youtubeUrl: 'https://www.youtube.com/watch?v=example',
   watchUrl: 'https://www.youtube.com/watch?v=example',
   videoTitle: '$10,000 in a Week — Inflatable Movie Theatre Business',
+  channelName: 'The Koerner Office',
 }
 
 function li(text: string) {
@@ -235,7 +236,13 @@ const SLIDE_PADDING_X = 20 // padding on each side of the card inside its slide 
 
 function EmblaCarouselCard({ card }: { card: CarouselCard }) {
   return (
-    <div style={{ padding: CARD_PADDING }}>
+    <div style={{
+      padding: CARD_PADDING,
+      minHeight: 400,
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+    }}>
       {card.title && (
         <p style={{ margin: '0 0 16px', fontSize: 32, fontWeight: 700, color: '#111111', lineHeight: 1.2 }}>
           {card.title}
@@ -306,63 +313,75 @@ function Carousel({ cards }: { cards: CarouselCard[] }) {
     boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
   }
 
+  // Gradient mask: transparent at page edges → opaque where the active card begins.
+  // peek cards dissolve into the background rather than being hard-clipped.
+  const halfCard = CARD_WIDTH / 2
+  const maskGradient = `linear-gradient(to right, transparent 0px, black calc(50% - ${halfCard}px), black calc(50% + ${halfCard}px), transparent 100%)`
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div style={{ position: 'relative', width: '100%' }}>
-        {/* Embla viewport — overflow:hidden clips the peek cards at the track boundary;
-            the page wrapper's overflow-x:hidden clips them at the screen edge */}
-        <div ref={emblaRef} style={{ overflow: 'hidden', width: '100%' }}>
-          <div style={{ display: 'flex' }}>
-            {cards.map((card, i) => {
-              const isActive = i === selectedIndex
-              return (
-                <div
-                  key={i}
-                  // Each slide occupies CARD_WIDTH + 2*SLIDE_PADDING_X in the track
-                  style={{
-                    flex: `0 0 ${CARD_WIDTH + SLIDE_PADDING_X * 2}px`,
-                    paddingLeft: SLIDE_PADDING_X,
-                    paddingRight: SLIDE_PADDING_X,
-                  }}
-                >
-                  {/* Inner card — scale and fade when not active */}
+        {/* Mask wrapper — fades peek cards toward the page edges */}
+        <div style={{
+          maskImage: maskGradient,
+          WebkitMaskImage: maskGradient,
+        }}>
+          {/* Embla viewport */}
+          <div ref={emblaRef} style={{ overflow: 'hidden', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'stretch' }}>
+              {cards.map((card, i) => {
+                const isActive = i === selectedIndex
+                return (
                   <div
+                    key={i}
                     style={{
-                      background: '#FFFFFF',
-                      borderRadius: CARD_RADIUS,
-                      transform: isActive ? 'scale(1)' : 'scale(0.8)',
-                      opacity: isActive ? 1 : 0.5,
-                      transition: 'transform 0.3s ease, opacity 0.3s ease',
-                      cursor: isActive ? 'default' : 'pointer',
-                      transformOrigin: 'center top',
+                      flex: `0 0 ${CARD_WIDTH + SLIDE_PADDING_X * 2}px`,
+                      paddingLeft: SLIDE_PADDING_X,
+                      paddingRight: SLIDE_PADDING_X,
+                      display: 'flex',
                     }}
-                    onClick={!isActive ? () => emblaApi?.scrollTo(i) : undefined}
                   >
-                    <EmblaCarouselCard card={card} />
+                    {/* Inner card — scale and fade when not active */}
+                    <div
+                      style={{
+                        flex: 1,
+                        background: '#FFFFFF',
+                        borderRadius: CARD_RADIUS,
+                        minHeight: 400,
+                        transform: isActive ? 'scale(1)' : 'scale(0.8)',
+                        opacity: isActive ? 1 : 0.5,
+                        transition: 'transform 0.3s ease, opacity 0.3s ease',
+                        cursor: isActive ? 'default' : 'pointer',
+                        transformOrigin: 'center center',
+                      }}
+                      onClick={!isActive ? () => emblaApi?.scrollTo(i) : undefined}
+                    >
+                      <EmblaCarouselCard card={card} />
+                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
         </div>
 
-        {/* Left arrow */}
+        {/* Left arrow — 32px from the active card's left edge */}
         {canPrev && (
           <button
             onClick={() => emblaApi?.scrollPrev()}
             aria-label="Previous"
-            style={{ ...ARROW_STYLE, left: `calc(50% - ${CARD_WIDTH / 2}px - ${SLIDE_PADDING_X}px - 56px)` }}
+            style={{ ...ARROW_STYLE, left: `calc(50% - ${halfCard}px - 32px - 72px)` }}
           >
             <ChevronLeft size={20} color="#111" />
           </button>
         )}
 
-        {/* Right arrow */}
+        {/* Right arrow — 32px from the active card's right edge */}
         {canNext && (
           <button
             onClick={() => emblaApi?.scrollNext()}
             aria-label="Next"
-            style={{ ...ARROW_STYLE, left: `calc(50% + ${CARD_WIDTH / 2}px + ${SLIDE_PADDING_X}px - 16px)` }}
+            style={{ ...ARROW_STYLE, left: `calc(50% + ${halfCard}px + 32px)` }}
           >
             <ChevronRight size={20} color="#111" />
           </button>
@@ -383,7 +402,7 @@ function Carousel({ cards }: { cards: CarouselCard[] }) {
               border: 'none',
               cursor: 'pointer',
               padding: 0,
-              background: i === selectedIndex ? '#08B9B9' : '#5E5E5E',
+              background: i === selectedIndex ? '#08B9B9' : '#C9C9C7',
               transition: 'background 0.2s ease',
             }}
           />
@@ -467,6 +486,10 @@ export default function TryPage() {
     const youtubeUrl = isMock ? MOCK_META.youtubeUrl : `https://www.youtube.com/watch?v=${result!.videoId}`
     const watchUrl = isMock ? MOCK_META.watchUrl : `https://www.youtube.com/watch?v=${result!.videoId}`
 
+    const videoTitle = isMock ? MOCK_META.videoTitle : result!.videoTitle
+    const channelName = isMock ? MOCK_META.channelName : result!.channelName
+    const channelInitial = channelName.charAt(0).toUpperCase()
+
     const fieldMap = new Map(fields.map((f) => [f.key, f]))
     const worthField = fieldMap.get('worth-watching-in-full')
     const worthText = worthField
@@ -488,7 +511,7 @@ export default function TryPage() {
           href={youtubeUrl}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ display: 'block', marginBottom: 48, width: 330, borderRadius: 16, overflow: 'hidden', flexShrink: 0 }}
+          style={{ display: 'block', width: 330, borderRadius: 16, overflow: 'hidden', flexShrink: 0 }}
         >
           <img
             src={thumbnailUrl}
@@ -497,14 +520,37 @@ export default function TryPage() {
           />
         </a>
 
-        {/* Tab nav */}
+        {/* Video title */}
+        <p style={{ margin: '16px 0 0', fontSize: 32, fontWeight: 700, color: '#000000', textAlign: 'center', maxWidth: 600, lineHeight: 1.2 }}>
+          {videoTitle}
+        </p>
+
+        {/* Channel avatar + name */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, marginBottom: 48 }}>
+          <div style={{
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            background: '#D4D0C8',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 14,
+            fontWeight: 700,
+            color: '#555',
+            flexShrink: 0,
+          }}>
+            {channelInitial}
+          </div>
+          <span style={{ fontSize: 16, color: '#333333' }}>{channelName}</span>
+        </div>
+
+        {/* Tab nav — no full-width border; only the active tab has an underline */}
         <div
           style={{
             display: 'flex',
             gap: 32,
             marginBottom: 48,
-            borderBottom: '1px solid rgba(0,0,0,0.1)',
-            paddingBottom: 0,
             width: '100%',
             maxWidth: 700,
             justifyContent: 'center',
@@ -522,10 +568,10 @@ export default function TryPage() {
                   borderBottom: isActive ? '4px solid #000000' : '4px solid transparent',
                   padding: '0 0 12px',
                   fontSize: 20,
-                  fontWeight: isActive ? 600 : 400,
+                  fontWeight: 700,
                   color: isActive ? '#000000' : 'rgba(0,0,0,0.5)',
                   cursor: 'pointer',
-                  transition: 'color 0.15s, border-color 0.15s',
+                  transition: 'color 0.15s',
                   whiteSpace: 'nowrap',
                 }}
               >
