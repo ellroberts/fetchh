@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Input } from '@/components/Input'
 import { Button } from '@/components/Button'
 
@@ -9,8 +10,8 @@ import { Button } from '@/components/Button'
 interface ParsedField {
   key: string
   label: string
-  bodyHtml: string  // raw HTML slice from cardHtml (or plain text for ai-relevance)
-  count?: number    // number of <li> items, if any
+  bodyHtml: string
+  count?: number
 }
 
 interface ExtractionResult {
@@ -33,7 +34,6 @@ const FIELD_ORDER = [
   'worth-watching-in-full',
 ]
 
-// Maps cleaned label text (lowercased, number-stripped) → canonical key
 const RAW_TO_KEY: Record<string, string> = {
   'tools mentioned': 'tools-mentioned',
   'techniques worth trying': 'techniques-worth-trying',
@@ -58,15 +58,115 @@ const KEY_TO_DISPLAY: Record<string, string> = {
   'worth-watching-in-full': 'Worth watching in full?',
 }
 
-const DEFAULT_EXPANDED = new Set(['ai-relevance', 'worth-watching-in-full'])
+// Tabs shown in the top nav — in display order
+const TABS: Array<{ key: string; label: string }> = [
+  { key: 'techniques-worth-trying', label: 'Techniques' },
+  { key: 'decision-relevant-facts', label: 'Facts' },
+  { key: 'mental-models', label: 'Mental models' },
+  { key: 'things-to-skip', label: 'Skip' },
+  { key: 'one-action-this-week', label: 'Do this week' },
+]
+
+// ── Parser ────────────────────────────────────────────────────────────────────
+
+function parseCardHtml(cardHtml: string): ParsedField[] {
+  const fields: ParsedField[] = []
+
+  const aiIdx = cardHtml.indexOf('AI relevance:')
+  if (aiIdx !== -1) {
+    const pStart = cardHtml.lastIndexOf('<p', aiIdx)
+    const pClose = cardHtml.indexOf('</p>', aiIdx)
+    if (pStart !== -1 && pClose !== -1) {
+      const text = cardHtml
+        .slice(pStart, pClose + 4)
+        .replace(/<[^>]+>/g, '')
+        .replace(/^AI relevance:\s*/i, '')
+        .trim()
+      fields.push({ key: 'ai-relevance', label: 'AI relevance', bodyHtml: text })
+    }
+  }
+
+  const labelRe = /<p style="margin:20px 0 4px;[^"]*">(.+?)<\/p>/g
+  const hits: Array<{ rawLabel: string; start: number; contentStart: number }> = []
+  let m: RegExpExecArray | null
+  while ((m = labelRe.exec(cardHtml)) !== null) {
+    hits.push({ rawLabel: m[1], start: m.index, contentStart: m.index + m[0].length })
+  }
+
+  for (let i = 0; i < hits.length; i++) {
+    const { rawLabel, contentStart } = hits[i]
+    const nextStart = hits[i + 1]?.start ?? cardHtml.length
+    const bodyHtml = cardHtml.slice(contentStart, nextStart).trim()
+    const cleanLabel = rawLabel
+      .replace(/<[^>]+>/g, '')
+      .replace(/^\d+\.\s*/, '')
+      .trim()
+      .toLowerCase()
+    const key = RAW_TO_KEY[cleanLabel] ?? cleanLabel.replace(/[^a-z0-9]+/g, '-')
+    const label = KEY_TO_DISPLAY[key] ?? cleanLabel
+    const liCount = (bodyHtml.match(/<li/g) ?? []).length
+    fields.push({ key, label, bodyHtml, count: liCount > 0 ? liCount : undefined })
+  }
+
+  return fields.sort((a, b) => {
+    const ai = FIELD_ORDER.indexOf(a.key)
+    const bi = FIELD_ORDER.indexOf(b.key)
+    return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
+  })
+}
+
+// ── Field → carousel cards ────────────────────────────────────────────────────
+
+// Each "card" is one displayable item (one li, or the full body for non-list fields)
+interface CarouselCard {
+  title: string   // bold heading in the card
+  body: string    // plain text content
+}
+
+function fieldToCards(field: ParsedField): CarouselCard[] {
+  const { key, bodyHtml } = field
+
+  // Single-text fields
+  if (key === 'ai-relevance' || key === 'one-action-this-week' || key === 'worth-watching-in-full') {
+    const text = bodyHtml.replace(/<[^>]+>/g, '').trim()
+    const title = KEY_TO_DISPLAY[key] ?? field.label
+    return text ? [{ title, body: text }] : []
+  }
+
+  // List fields — each <li> becomes its own card
+  const liMatches = [...bodyHtml.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)]
+  if (liMatches.length > 0) {
+    return liMatches.map((match) => {
+      const content = match[1]
+      const boldMatch = content.match(/^<strong>([\s\S]*?)<\/strong>([\s\S]*)/)
+      if (boldMatch) {
+        const title = boldMatch[1].replace(/<[^>]+>/g, '').trim()
+        const body = boldMatch[2].replace(/^\s*[—–-]\s*/, '').replace(/<[^>]+>/g, '').trim()
+        return { title, body }
+      }
+      return { title: '', body: content.replace(/<[^>]+>/g, '').trim() }
+    })
+  }
+
+  // Non-list, non-single-text fields (paragraphs)
+  const paragraphs = bodyHtml
+    .split('</p>')
+    .map((s) => s.replace(/<[^>]+>/g, '').trim())
+    .filter(Boolean)
+  if (paragraphs.length > 0) {
+    return [{ title: field.label, body: paragraphs.join('\n\n') }]
+  }
+
+  return []
+}
 
 // ── Mock fixture ──────────────────────────────────────────────────────────────
 
 const MOCK_META = {
   thumbnailUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
   youtubeUrl: 'https://www.youtube.com/watch?v=example',
-  // videoId used only for the FieldBody "Watch now" link
   watchUrl: 'https://www.youtube.com/watch?v=example',
+  videoTitle: '$10,000 in a Week — Inflatable Movie Theatre Business',
 }
 
 function li(text: string) {
@@ -79,11 +179,7 @@ const MOCK_FIELDS: ParsedField[] = [
     label: 'AI relevance',
     bodyHtml: 'This is entirely about starting an inflatable movie theatre rental business with no mention of AI tools or workflows.',
   },
-  {
-    key: 'tools-mentioned',
-    label: 'Tools mentioned',
-    bodyHtml: '',
-  },
+  { key: 'tools-mentioned', label: 'Tools mentioned', bodyHtml: '' },
   {
     key: 'techniques-worth-trying',
     label: 'Techniques worth trying',
@@ -127,217 +223,209 @@ const MOCK_FIELDS: ParsedField[] = [
   },
 ]
 
-// ── Parser ────────────────────────────────────────────────────────────────────
+// ── Carousel ──────────────────────────────────────────────────────────────────
 
-function parseCardHtml(cardHtml: string): ParsedField[] {
-  const fields: ParsedField[] = []
+const CARD_WIDTH = 600
+const CARD_RADIUS = 24
+const CARD_PADDING = 32
+const PEEK_SCALE = 0.8
+const PEEK_OPACITY = 0.5
+// Gap between active card edge and start of peeking card
+const PEEK_GAP = 24
 
-  // 1. AI relevance — find "AI relevance:" text, back up to its <p>, extract plain text
-  const aiIdx = cardHtml.indexOf('AI relevance:')
-  if (aiIdx !== -1) {
-    const pStart = cardHtml.lastIndexOf('<p', aiIdx)
-    const pClose = cardHtml.indexOf('</p>', aiIdx)
-    if (pStart !== -1 && pClose !== -1) {
-      const raw = cardHtml.slice(pStart, pClose + 4)
-      const text = raw
-        .replace(/<[^>]+>/g, '')
-        .replace(/^AI relevance:\s*/i, '')
-        .trim()
-      fields.push({ key: 'ai-relevance', label: 'AI relevance', bodyHtml: text })
-    }
-  }
-
-  // 2. Numbered section fields — label paragraphs have the unique LABEL_STYLE
-  //    from cardToHtml: margin:20px 0 4px;font-size:11px;font-weight:700...
-  const labelRe = /<p style="margin:20px 0 4px;[^"]*">(.+?)<\/p>/g
-  const hits: Array<{ rawLabel: string; start: number; contentStart: number }> = []
-  let m: RegExpExecArray | null
-  while ((m = labelRe.exec(cardHtml)) !== null) {
-    hits.push({ rawLabel: m[1], start: m.index, contentStart: m.index + m[0].length })
-  }
-
-  for (let i = 0; i < hits.length; i++) {
-    const { rawLabel, contentStart } = hits[i]
-    const nextStart = hits[i + 1]?.start ?? cardHtml.length
-    const bodyHtml = cardHtml.slice(contentStart, nextStart).trim()
-
-    const cleanLabel = rawLabel
-      .replace(/<[^>]+>/g, '')
-      .replace(/^\d+\.\s*/, '')
-      .trim()
-      .toLowerCase()
-
-    const key = RAW_TO_KEY[cleanLabel] ?? cleanLabel.replace(/[^a-z0-9]+/g, '-')
-    const label = KEY_TO_DISPLAY[key] ?? cleanLabel
-    const liCount = (bodyHtml.match(/<li/g) ?? []).length
-
-    fields.push({ key, label, bodyHtml, count: liCount > 0 ? liCount : undefined })
-  }
-
-  return fields.sort((a, b) => {
-    const ai = FIELD_ORDER.indexOf(a.key)
-    const bi = FIELD_ORDER.indexOf(b.key)
-    return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
-  })
-}
-
-// ── Field body renderer ───────────────────────────────────────────────────────
-
-function FieldBody({ field, watchUrl }: { field: ParsedField; watchUrl: string }) {
-  const { key, bodyHtml, count } = field
-
-  // AI relevance — plain text stored in bodyHtml
-  if (key === 'ai-relevance') {
-    return (
-      <p style={{ margin: 0, fontSize: 14, color: '#333', lineHeight: 1.6 }}>{bodyHtml}</p>
-    )
-  }
-
-  // Tools mentioned with no items
-  if (key === 'tools-mentioned' && !count) {
-    const plainText = bodyHtml.replace(/<[^>]+>/g, '').trim()
-    const isEmpty = !plainText || /^nothing notable\.?$/i.test(plainText)
-    if (isEmpty) {
-      return <p style={{ margin: 0, fontSize: 14, color: '#999', lineHeight: 1.6 }}>None mentioned</p>
-    }
-  }
-
-  // Fields with list items — render each <li> as label + body
-  const liMatches = [...bodyHtml.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)]
-  if (liMatches.length > 0) {
-    return (
-      <div>
-        {liMatches.map((match, i) => {
-          const content = match[1]
-          const boldMatch = content.match(/^<strong>([\s\S]*?)<\/strong>([\s\S]*)/)
-          const isLast = i === liMatches.length - 1
-
-          if (boldMatch) {
-            const itemLabel = boldMatch[1].replace(/<[^>]+>/g, '').toUpperCase()
-            const itemBody = boldMatch[2].replace(/^\s*[—–-]\s*/, '').trim()
-            return (
-              <div key={i} style={{ marginBottom: isLast ? 0 : 16 }}>
-                <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#999' }}>
-                  {itemLabel}
-                </p>
-                <p
-                  style={{ margin: 0, fontSize: 14, color: '#333', lineHeight: 1.6 }}
-                  dangerouslySetInnerHTML={{ __html: itemBody }}
-                />
-              </div>
-            )
-          }
-
-          // Plain list item (no bold label)
-          return (
-            <div key={i} style={{ marginBottom: isLast ? 0 : 16 }}>
-              <p
-                style={{ margin: 0, fontSize: 14, color: '#333', lineHeight: 1.6 }}
-                dangerouslySetInnerHTML={{ __html: content }}
-              />
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
-
-  // Non-list fields — split by </p> to preserve paragraph breaks, strip HTML tags
-  const paragraphs = bodyHtml
-    .split('</p>')
-    .map((s) => s.replace(/<[^>]+>/g, '').trim())
-    .filter(Boolean)
-
+function CarouselCard({ card }: { card: CarouselCard }) {
   return (
-    <div>
-      {paragraphs.map((para, i) => (
-        <p key={i} style={{ margin: i < paragraphs.length - 1 ? '0 0 8px' : 0, fontSize: 14, color: '#333', lineHeight: 1.6 }}>
-          {para}
+    <div style={{ padding: CARD_PADDING }}>
+      {card.title && (
+        <p style={{ margin: '0 0 16px', fontSize: 32, fontWeight: 700, color: '#111111', lineHeight: 1.2 }}>
+          {card.title}
         </p>
-      ))}
-      {key === 'worth-watching-in-full' && (
-        <a
-          href={watchUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ display: 'inline-block', marginTop: 12, fontSize: 14, color: '#2563EB', textDecoration: 'none' }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = 'underline' }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = 'none' }}
-        >
-          Watch now →
-        </a>
       )}
+      <p style={{ margin: 0, fontSize: 20, lineHeight: '32px', color: '#333333', whiteSpace: 'pre-wrap' }}>
+        {card.body}
+      </p>
     </div>
   )
 }
 
-// ── Collapsible field card ────────────────────────────────────────────────────
-
-function FieldCard({
-  field,
-  expanded,
-  onToggle,
+function Carousel({
+  cards,
   watchUrl,
 }: {
-  field: ParsedField
-  expanded: boolean
-  onToggle: () => void
+  cards: CarouselCard[]
   watchUrl: string
 }) {
+  const [activeIdx, setActiveIdx] = useState(0)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
+
+  useEffect(() => {
+    setActiveIdx(0)
+  }, [cards])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const obs = new ResizeObserver(() => setContainerWidth(el.offsetWidth))
+    obs.observe(el)
+    setContainerWidth(el.offsetWidth)
+    return () => obs.disconnect()
+  }, [])
+
+  const canPrev = activeIdx > 0
+  const canNext = activeIdx < cards.length - 1
+
+  if (cards.length === 0) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div style={{
+          width: CARD_WIDTH,
+          background: '#FFFFFF',
+          borderRadius: CARD_RADIUS,
+          padding: CARD_PADDING,
+          textAlign: 'center',
+          color: '#999',
+          fontSize: 16,
+        }}>
+          Nothing to show here
+        </div>
+      </div>
+    )
+  }
+
+  // How far the peek card is offset from the active card edge
+  const peekCardOffset = CARD_WIDTH + PEEK_GAP
+
   return (
-    <div
-      style={{
-        background: '#FFFFFF',
-        borderRadius: 12,
-        padding: 20,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-      }}
-    >
-      <button
-        onClick={onToggle}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {/* Carousel track — overflow visible so peek cards are visible */}
+      <div
+        ref={containerRef}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          position: 'relative',
           width: '100%',
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          cursor: 'pointer',
-          textAlign: 'left',
+          // Height driven by active card; peek cards are the same element size
+          height: 'auto',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'flex-start',
+          overflow: 'visible',
         }}
       >
-        <span style={{ fontSize: 16, fontWeight: 600, color: '#111111' }}>
-          {field.label}
-        </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          {field.count !== undefined && (
-            <span style={{ fontSize: 16, color: '#111111' }}>{field.count}</span>
-          )}
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#111111"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        {/* Render prev peek, active, next peek */}
+        {cards.map((card, i) => {
+          const offset = i - activeIdx // -1=prev, 0=active, 1=next
+          if (Math.abs(offset) > 1) return null
+
+          const isActive = offset === 0
+          const translateX = offset * peekCardOffset
+          const scale = isActive ? 1 : PEEK_SCALE
+          const opacity = isActive ? 1 : PEEK_OPACITY
+
+          return (
+            <div
+              key={i}
+              onClick={!isActive ? () => setActiveIdx(i) : undefined}
+              style={{
+                position: isActive ? 'relative' : 'absolute',
+                top: 0,
+                left: isActive ? undefined : '50%',
+                width: CARD_WIDTH,
+                background: '#FFFFFF',
+                borderRadius: CARD_RADIUS,
+                transform: isActive
+                  ? undefined
+                  : `translateX(calc(-50% + ${translateX}px)) scale(${scale})`,
+                transformOrigin: offset < 0 ? 'right center' : 'left center',
+                opacity,
+                transition: 'transform 0.3s ease, opacity 0.3s ease',
+                cursor: isActive ? 'default' : 'pointer',
+                flexShrink: 0,
+                zIndex: isActive ? 2 : 1,
+                // Clip peek cards at page edge
+                overflow: 'hidden',
+              }}
+            >
+              <CarouselCard card={card} />
+            </div>
+          )
+        })}
+
+        {/* Left arrow */}
+        {canPrev && (
+          <button
+            onClick={() => setActiveIdx(activeIdx - 1)}
+            aria-label="Previous"
             style={{
-              transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.2s ease',
+              position: 'absolute',
+              left: `calc(50% - ${CARD_WIDTH / 2}px - 36px - 20px)`,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 10,
+              width: 72,
+              height: 72,
+              borderRadius: '50%',
+              background: '#FFFFFF',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
             }}
           >
-            <path d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-      </button>
+            <ChevronLeft size={20} color="#111" />
+          </button>
+        )}
 
-      {expanded && (
-        <div style={{ marginTop: 12 }}>
-          <FieldBody field={field} watchUrl={watchUrl} />
-        </div>
-      )}
+        {/* Right arrow */}
+        {canNext && (
+          <button
+            onClick={() => setActiveIdx(activeIdx + 1)}
+            aria-label="Next"
+            style={{
+              position: 'absolute',
+              left: `calc(50% + ${CARD_WIDTH / 2}px - 36px + 20px)`,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 10,
+              width: 72,
+              height: 72,
+              borderRadius: '50%',
+              background: '#FFFFFF',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+            }}
+          >
+            <ChevronRight size={20} color="#111" />
+          </button>
+        )}
+      </div>
+
+      {/* Pagination dots */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 48 }}>
+        {cards.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setActiveIdx(i)}
+            aria-label={`Go to card ${i + 1}`}
+            style={{
+              width: 16,
+              height: 16,
+              borderRadius: '50%',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              background: i === activeIdx ? '#08B9B9' : '#5E5E5E',
+              transition: 'background 0.2s ease',
+            }}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -345,16 +433,12 @@ function FieldCard({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 const PAGE: React.CSSProperties = {
-  background: '#E8E4DC',
+  background: '#F7F6F4',
   minHeight: '100vh',
   display: 'flex',
-  justifyContent: 'center',
-  padding: '24px 16px',
-}
-
-const COLUMN: React.CSSProperties = {
-  width: '100%',
-  maxWidth: 560,
+  flexDirection: 'column',
+  alignItems: 'center',
+  padding: '48px 16px 80px',
 }
 
 export default function TryPage() {
@@ -363,8 +447,8 @@ export default function TryPage() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [result, setResult] = useState<ExtractionResult | null>(null)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(DEFAULT_EXPANDED))
   const [isMock, setIsMock] = useState(false)
+  const [activeTab, setActiveTab] = useState(TABS[0].key)
 
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mock') === 'true') {
@@ -378,7 +462,6 @@ export default function TryPage() {
     setStatus('loading')
     setErrorMsg('')
     setResult(null)
-    setExpanded(new Set(DEFAULT_EXPANDED))
 
     try {
       const res = await fetch('/api/try', {
@@ -400,83 +483,154 @@ export default function TryPage() {
     }
   }
 
-  const toggleField = (key: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
+  // ── Loading ────────────────────────────────────────────────────────────────
 
-  // Loading
   if (status === 'loading') {
     return (
-      <main style={{ ...PAGE, alignItems: 'center' }}>
+      <main style={{ ...PAGE, justifyContent: 'center' }}>
         <p style={{ margin: 0, fontSize: 16, color: '#555' }}>Analysing video…</p>
       </main>
     )
   }
 
-  // Results
+  // ── Results ────────────────────────────────────────────────────────────────
+
   if (status === 'done' && (result || isMock)) {
     const fields = isMock ? MOCK_FIELDS : parseCardHtml(result!.cardHtml)
     const thumbnailUrl = isMock
       ? MOCK_META.thumbnailUrl
       : `https://img.youtube.com/vi/${result!.videoId}/maxresdefault.jpg`
-    const youtubeUrl = isMock
-      ? MOCK_META.youtubeUrl
-      : `https://www.youtube.com/watch?v=${result!.videoId}`
+    const youtubeUrl = isMock ? MOCK_META.youtubeUrl : `https://www.youtube.com/watch?v=${result!.videoId}`
     const watchUrl = isMock ? MOCK_META.watchUrl : `https://www.youtube.com/watch?v=${result!.videoId}`
-    const videoTitle = isMock ? '$10,000 in a Week — Inflatable Movie Theatre Business' : result!.videoTitle
+
+    const fieldMap = new Map(fields.map((f) => [f.key, f]))
+    const worthField = fieldMap.get('worth-watching-in-full')
+    const worthText = worthField
+      ? worthField.bodyHtml.replace(/<[^>]+>/g, '').trim()
+      : ''
+
+    const activeField = fieldMap.get(activeTab)
+    const activeCards = activeField ? fieldToCards(activeField) : []
 
     return (
       <main style={PAGE}>
-        <div style={COLUMN}>
-          <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginBottom: 16 }}>
-            <img
-              src={thumbnailUrl}
-              alt={videoTitle}
-              style={{ display: 'block', width: '100%', borderRadius: 12 }}
-            />
-          </a>
+        {/* Logo */}
+        <p style={{ margin: '0 0 48px', fontSize: 24, fontWeight: 700, letterSpacing: '0.08em', color: '#111', fontFamily: 'inherit' }}>
+          DIGESTT
+        </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {fields.map((field) => (
-              <FieldCard
-                key={field.key}
-                field={field}
-                expanded={expanded.has(field.key)}
-                onToggle={() => toggleField(field.key)}
-                watchUrl={watchUrl}
-              />
-            ))}
-          </div>
+        {/* Thumbnail */}
+        <a
+          href={youtubeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: 'block', marginBottom: 48, width: 330, borderRadius: 16, overflow: 'hidden', flexShrink: 0 }}
+        >
+          <img
+            src={thumbnailUrl}
+            alt="Video thumbnail"
+            style={{ display: 'block', width: '100%' }}
+          />
+        </a>
 
-          <div style={{ marginTop: 24, textAlign: 'center' }}>
-            <button
-              onClick={() => { setStatus('idle'); setResult(null); setIsMock(false) }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#666', textDecoration: 'underline', padding: 0 }}
+        {/* Tab nav */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 32,
+            marginBottom: 48,
+            borderBottom: '1px solid rgba(0,0,0,0.1)',
+            paddingBottom: 0,
+            width: '100%',
+            maxWidth: 700,
+            justifyContent: 'center',
+          }}
+        >
+          {TABS.map((tab) => {
+            const isActive = tab.key === activeTab
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: isActive ? '4px solid #000000' : '4px solid transparent',
+                  padding: '0 0 12px',
+                  fontSize: 20,
+                  fontWeight: isActive ? 600 : 400,
+                  color: isActive ? '#000000' : 'rgba(0,0,0,0.5)',
+                  cursor: 'pointer',
+                  transition: 'color 0.15s, border-color 0.15s',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Carousel */}
+        <div style={{ width: '100%', marginBottom: 0 }}>
+          <Carousel key={activeTab} cards={activeCards} watchUrl={watchUrl} />
+        </div>
+
+        {/* Worth watching module */}
+        {worthText && (
+          <div style={{
+            width: CARD_WIDTH,
+            background: 'rgba(255,255,255,0.8)',
+            borderRadius: CARD_RADIUS,
+            padding: CARD_PADDING,
+            marginTop: 48,
+          }}>
+            <p style={{ margin: '0 0 12px', fontSize: 24, fontWeight: 700, color: '#111111' }}>
+              Worth watching?
+            </p>
+            <p style={{ margin: '0 0 16px', fontSize: 16, color: '#333333', lineHeight: 1.6 }}>
+              {worthText}
+            </p>
+            <a
+              href={watchUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 16, color: '#3086FF', textDecoration: 'none' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = 'underline' }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = 'none' }}
             >
-              Try another video
-            </button>
+              Watch now →
+            </a>
           </div>
+        )}
+
+        {/* Try another */}
+        <div style={{ marginTop: 32 }}>
+          <button
+            onClick={() => { setStatus('idle'); setResult(null); setIsMock(false) }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#999', textDecoration: 'underline', padding: 0 }}
+          >
+            Try another video
+          </button>
         </div>
       </main>
     )
   }
 
-  // Form (idle / error)
+  // ── Form (idle / error) ────────────────────────────────────────────────────
+
   return (
-    <main style={{ ...PAGE, alignItems: 'flex-start', paddingTop: 48 }}>
-      <div style={COLUMN}>
+    <main style={{ ...PAGE, justifyContent: 'flex-start' }}>
+      <p style={{ margin: '0 0 48px', fontSize: 24, fontWeight: 700, letterSpacing: '0.08em', color: '#111', fontFamily: 'inherit' }}>
+        DIGESTT
+      </p>
+      <div style={{ width: '100%', maxWidth: 480 }}>
         <h1 style={{ margin: '0 0 8px', fontSize: 28, fontWeight: 700, color: '#111' }}>
           Try it on a video
         </h1>
         <p style={{ margin: '0 0 28px', fontSize: 16, color: '#555', lineHeight: 1.5 }}>
-          Paste any YouTube video URL and get an instant extraction — the same format as your weekly digest.
+          Paste any YouTube video URL and get an instant extraction.
         </p>
-
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Input
             type="email"
@@ -495,11 +649,9 @@ export default function TryPage() {
             onChange={(e) => setVideoUrl((e.target as HTMLInputElement).value)}
             required
           />
-
           {status === 'error' && (
             <p style={{ margin: 0, fontSize: 14, color: '#dc2626' }}>{errorMsg}</p>
           )}
-
           <Button type="submit" variant="primary" size="lg" style={{ width: '100%' }}>
             Get digest
           </Button>
