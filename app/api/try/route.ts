@@ -51,7 +51,8 @@ export async function POST(req: Request) {
   let card: string
   try {
     card = await extractWithClaude(transcriptResult.text, channelName, videoTitle)
-  } catch {
+  } catch (err) {
+    console.error('extractWithClaude failed:', err)
     return NextResponse.json({ error: 'Extraction failed. Please try again.' }, { status: 500 })
   }
 

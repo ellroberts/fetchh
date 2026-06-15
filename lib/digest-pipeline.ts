@@ -16,7 +16,7 @@ import { EXTRACTION_PROMPT } from './extraction-prompt'
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
 const SUPADATA_BASE = 'https://api.supadata.ai/v1'
-const MODEL = 'claude-sonnet-4-20250514'
+const MODEL = 'claude-sonnet-4-6'
 const CHANNEL_VIDEO_FETCH_LIMIT = 30
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
 const RETRY_DELAYS_MS = [1000, 3000]
