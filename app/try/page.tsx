@@ -61,11 +61,11 @@ const KEY_TO_DISPLAY: Record<string, string> = {
 
 // Tabs shown in the top nav — in display order
 const TABS: Array<{ key: string; label: string }> = [
-  { key: 'techniques-worth-trying', label: 'Techniques' },
-  { key: 'decision-relevant-facts', label: 'Facts' },
-  { key: 'mental-models', label: 'Mental models' },
-  { key: 'things-to-skip', label: 'Skip' },
-  { key: 'one-action-this-week', label: 'Do this week' },
+  { key: 'techniques-worth-trying', label: 'Try this' },
+  { key: 'decision-relevant-facts', label: 'Worth knowing' },
+  { key: 'mental-models', label: 'See it differently' },
+  { key: 'things-to-skip', label: "Don't bother" },
+  { key: 'one-action-this-week', label: 'This week' },
 ]
 
 // ── Parser ────────────────────────────────────────────────────────────────────
@@ -420,7 +420,7 @@ const PAGE: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  padding: '48px 16px 80px',
+  padding: '104px 16px 144px',
   overflowX: 'hidden',
 }
 
@@ -468,11 +468,24 @@ export default function TryPage() {
 
   // ── Loading ────────────────────────────────────────────────────────────────
 
+  const FixedHeader = () => (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, height: 56,
+      background: '#FFF', borderBottom: '1px solid #E5E5E5', zIndex: 100,
+      display: 'flex', alignItems: 'center', paddingLeft: 24,
+    }}>
+      <span style={{ fontSize: 24, fontWeight: 700, color: '#111', letterSpacing: '0.08em' }}>Digestt</span>
+    </div>
+  )
+
   if (status === 'loading') {
     return (
-      <main style={{ ...PAGE, justifyContent: 'center' }}>
-        <p style={{ margin: 0, fontSize: 16, color: '#555' }}>Analysing video…</p>
-      </main>
+      <>
+        <FixedHeader />
+        <main style={{ ...PAGE, justifyContent: 'center' }}>
+          <p style={{ margin: 0, fontSize: 16, color: '#555' }}>Analysing video…</p>
+        </main>
+      </>
     )
   }
 
@@ -500,12 +513,9 @@ export default function TryPage() {
     const activeCards = activeField ? fieldToCards(activeField) : []
 
     return (
-      <main style={PAGE}>
-        {/* Logo */}
-        <p style={{ margin: '0 0 48px', fontSize: 24, fontWeight: 700, letterSpacing: '0.08em', color: '#111', fontFamily: 'inherit' }}>
-          DIGESTT
-        </p>
-
+      <>
+        <FixedHeader />
+        <main style={PAGE}>
         {/* Thumbnail */}
         <a
           href={youtubeUrl}
@@ -526,7 +536,7 @@ export default function TryPage() {
         </p>
 
         {/* Channel avatar + name */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, marginBottom: 48 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, marginBottom: 64 }}>
           <div style={{
             width: 32,
             height: 32,
@@ -543,42 +553,6 @@ export default function TryPage() {
             {channelInitial}
           </div>
           <span style={{ fontSize: 16, color: '#333333' }}>{channelName}</span>
-        </div>
-
-        {/* Tab nav — no full-width border; only the active tab has an underline */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 32,
-            marginBottom: 48,
-            width: '100%',
-            maxWidth: 700,
-            justifyContent: 'center',
-          }}
-        >
-          {TABS.map((tab) => {
-            const isActive = tab.key === activeTab
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: isActive ? '4px solid #000000' : '4px solid transparent',
-                  padding: '0 0 12px',
-                  fontSize: 20,
-                  fontWeight: 700,
-                  color: isActive ? '#000000' : 'rgba(0,0,0,0.5)',
-                  cursor: 'pointer',
-                  transition: 'color 0.15s',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {tab.label}
-              </button>
-            )
-          })}
         </div>
 
         {/* Carousel */}
@@ -624,16 +598,45 @@ export default function TryPage() {
           </button>
         </div>
       </main>
+
+        {/* Fixed footer nav */}
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, height: 64,
+          background: '#FFF', borderTop: '1px solid #E5E5E5', zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32,
+        }}>
+          {TABS.map((tab) => {
+            const isActive = tab.key === activeTab
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: isActive ? '#000000' : 'rgba(0,0,0,0.5)',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
+      </>
     )
   }
 
   // ── Form (idle / error) ────────────────────────────────────────────────────
 
   return (
-    <main style={{ ...PAGE, justifyContent: 'flex-start' }}>
-      <p style={{ margin: '0 0 48px', fontSize: 24, fontWeight: 700, letterSpacing: '0.08em', color: '#111', fontFamily: 'inherit' }}>
-        DIGESTT
-      </p>
+    <>
+      <FixedHeader />
+      <main style={{ ...PAGE, justifyContent: 'flex-start' }}>
       <div style={{ width: '100%', maxWidth: 480 }}>
         <h1 style={{ margin: '0 0 8px', fontSize: 28, fontWeight: 700, color: '#111' }}>
           Try it on a video
@@ -667,6 +670,7 @@ export default function TryPage() {
           </Button>
         </form>
       </div>
-    </main>
+      </main>
+    </>
   )
 }
