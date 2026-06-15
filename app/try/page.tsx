@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import useEmblaCarousel from 'embla-carousel-react'
 import { Input } from '@/components/Input'
 import { Button } from '@/components/Button'
@@ -232,7 +232,7 @@ const CARD_RADIUS = 24
 const CARD_PADDING = 32
 // Horizontal space each slide occupies in the Embla flex track.
 // Extra beyond CARD_WIDTH creates the gap between cards and allows peeking.
-const SLIDE_PADDING_X = 20 // padding on each side of the card inside its slide slot
+const SLIDE_PADDING_X = 16 // padding on each side of the card inside its slide slot — gap between cards = 2× this
 
 function EmblaCarouselCard({ card }: { card: CarouselCard }) {
   return (
@@ -301,25 +301,42 @@ function Carousel({ cards }: { cards: CarouselCard[] }) {
     top: '50%',
     transform: 'translateY(-50%)',
     zIndex: 10,
-    width: 72,
-    height: 72,
-    borderRadius: '50%',
-    background: '#FFFFFF',
+    background: 'none',
     border: 'none',
     cursor: 'pointer',
+    padding: 0,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
   }
 
   // Gradient mask: transparent at page edges → opaque where the active card begins.
-  // peek cards dissolve into the background rather than being hard-clipped.
   const halfCard = CARD_WIDTH / 2
   const maskGradient = `linear-gradient(to right, transparent 0px, black calc(50% - ${halfCard}px), black calc(50% + ${halfCard}px), transparent 100%)`
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {/* Pagination dots — above the carousel */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12 }}>
+        {cards.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => emblaApi?.scrollTo(i)}
+            aria-label={`Go to card ${i + 1}`}
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              background: i === selectedIndex ? '#08B9B9' : '#C9C9C7',
+              transition: 'background 0.2s ease',
+            }}
+          />
+        ))}
+      </div>
+
       <div style={{ position: 'relative', width: '100%' }}>
         {/* Mask wrapper — fades peek cards toward the page edges */}
         <div style={{
@@ -370,9 +387,9 @@ function Carousel({ cards }: { cards: CarouselCard[] }) {
           <button
             onClick={() => emblaApi?.scrollPrev()}
             aria-label="Previous"
-            style={{ ...ARROW_STYLE, left: `calc(50% - ${halfCard}px - 32px - 72px)` }}
+            style={{ ...ARROW_STYLE, left: `calc(50% - ${halfCard}px - 32px - 24px)` }}
           >
-            <ChevronLeft size={20} color="#111" />
+            <ArrowLeft size={24} color="#6C74FB" />
           </button>
         )}
 
@@ -383,30 +400,9 @@ function Carousel({ cards }: { cards: CarouselCard[] }) {
             aria-label="Next"
             style={{ ...ARROW_STYLE, left: `calc(50% + ${halfCard}px + 32px)` }}
           >
-            <ChevronRight size={20} color="#111" />
+            <ArrowRight size={24} color="#6C74FB" />
           </button>
         )}
-      </div>
-
-      {/* Pagination dots */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 48 }}>
-        {cards.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => emblaApi?.scrollTo(i)}
-            aria-label={`Go to card ${i + 1}`}
-            style={{
-              width: 16,
-              height: 16,
-              borderRadius: '50%',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-              background: i === selectedIndex ? '#08B9B9' : '#C9C9C7',
-              transition: 'background 0.2s ease',
-            }}
-          />
-        ))}
       </div>
     </div>
   )
@@ -468,13 +464,30 @@ export default function TryPage() {
 
   // ── Loading ────────────────────────────────────────────────────────────────
 
-  const FixedHeader = () => (
+  const FixedHeader = ({ videoTitle, channelName, channelInitial }: { videoTitle?: string; channelName?: string; channelInitial?: string }) => (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, height: 56,
       background: '#FFF', borderBottom: '1px solid #E5E5E5', zIndex: 100,
-      display: 'flex', alignItems: 'center', paddingLeft: 24,
+      display: 'flex', alignItems: 'center', paddingLeft: 24, paddingRight: 24,
     }}>
-      <span style={{ fontSize: 24, fontWeight: 700, color: '#111', letterSpacing: '0.08em' }}>Digestt</span>
+      <span style={{ fontSize: 24, fontWeight: 700, color: '#111', letterSpacing: '0.08em', flexShrink: 0 }}>Digestt</span>
+      {videoTitle && (
+        <span style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 16px' }}>
+          {videoTitle}
+        </span>
+      )}
+      {channelName && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <div style={{
+            width: 24, height: 24, borderRadius: '50%', background: '#D4D0C8',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, fontWeight: 700, color: '#555',
+          }}>
+            {channelInitial}
+          </div>
+          <span style={{ fontSize: 14, color: '#333' }}>{channelName}</span>
+        </div>
+      )}
     </div>
   )
 
@@ -514,14 +527,14 @@ export default function TryPage() {
 
     return (
       <>
-        <FixedHeader />
+        <FixedHeader videoTitle={videoTitle} channelName={channelName} channelInitial={channelInitial} />
         <main style={PAGE}>
         {/* Thumbnail */}
         <a
           href={youtubeUrl}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ display: 'block', width: 330, borderRadius: 16, overflow: 'hidden', flexShrink: 0 }}
+          style={{ display: 'block', width: 330, borderRadius: 16, overflow: 'hidden', flexShrink: 0, marginBottom: 32 }}
         >
           <img
             src={thumbnailUrl}
@@ -530,34 +543,24 @@ export default function TryPage() {
           />
         </a>
 
-        {/* Video title */}
-        <p style={{ margin: '16px 0 0', fontSize: 32, fontWeight: 700, color: '#000000', textAlign: 'center', maxWidth: 600, lineHeight: 1.2 }}>
-          {videoTitle}
-        </p>
-
-        {/* Channel avatar + name */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, marginBottom: 64 }}>
-          <div style={{
-            width: 32,
-            height: 32,
-            borderRadius: '50%',
-            background: '#D4D0C8',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 14,
-            fontWeight: 700,
-            color: '#555',
-            flexShrink: 0,
-          }}>
-            {channelInitial}
-          </div>
-          <span style={{ fontSize: 16, color: '#333333' }}>{channelName}</span>
-        </div>
-
         {/* Carousel */}
         <div style={{ width: '100%', marginBottom: 0 }}>
           <Carousel key={activeTab} cards={activeCards} />
+        </div>
+
+        {/* Inspired? quick links */}
+        <div style={{ width: CARD_WIDTH, marginTop: 48, textAlign: 'center' }}>
+          <p style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 400, color: '#000' }}>
+            Inspired? Here&apos;s some quick links
+          </p>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #E5E5E5', background: '#FFF', fontSize: 14, cursor: 'pointer' }}>
+              Placeholder
+            </button>
+            <button style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #E5E5E5', background: '#FFF', fontSize: 14, cursor: 'pointer' }}>
+              Placeholder
+            </button>
+          </div>
         </div>
 
         {/* Worth watching module */}
