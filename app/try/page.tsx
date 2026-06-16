@@ -278,7 +278,7 @@ const CARD_PADDING = 32
 // Extra beyond CARD_WIDTH creates the gap between cards and allows peeking.
 const SLIDE_PADDING_X = 16 // padding on each side of the card inside its slide slot — gap between cards = 2× this
 
-function EmblaCarouselCard({ card }: { card: CarouselCard }) {
+function EmblaCarouselCard({ card, extra }: { card: CarouselCard; extra?: React.ReactNode }) {
   const hasBullets = card.bullets && card.bullets.length > 0
   return (
     <div style={{
@@ -290,51 +290,57 @@ function EmblaCarouselCard({ card }: { card: CarouselCard }) {
       alignItems: hasBullets ? 'flex-start' : 'center',
       textAlign: hasBullets ? 'left' : 'center',
     }}>
-      {card.title && (
-        <p style={{ margin: '0 0 16px', fontSize: 28, fontWeight: 700, color: '#111111', lineHeight: 1.2, textAlign: hasBullets ? 'left' : 'center', width: '100%' }}>
-          {card.title}
-        </p>
-      )}
-      {card.body && (
-        <p style={{ margin: hasBullets ? '0 0 16px' : '0', fontSize: 18, lineHeight: '28px', color: '#333333', whiteSpace: 'pre-wrap', textAlign: hasBullets ? 'left' : 'center' }}>
-          {card.body}
-        </p>
-      )}
-      {hasBullets && (
-        <ul style={{ margin: 0, padding: 0, listStyle: 'none', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {card.bullets!.map((bullet, i) => (
-            <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span style={{ color: '#6C74FB', fontSize: 18, lineHeight: '26px', flexShrink: 0 }}>•</span>
-              <span style={{ fontSize: 16, lineHeight: '26px', color: '#333333' }}>{bullet}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {card.url && (
-        <a
-          href={card.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            marginTop: 24,
-            display: 'inline-block',
-            padding: '8px 16px',
-            borderRadius: 12,
-            border: '1px solid #E5E5E5',
-            background: '#FFFFFF',
-            fontSize: 14,
-            color: '#111111',
-            textDecoration: 'none',
-          }}
-        >
-          Open link →
-        </a>
+      {extra ? (
+        <div style={{ width: '100%' }}>{extra}</div>
+      ) : (
+        <>
+          {card.title && (
+            <p style={{ margin: '0 0 16px', fontSize: 28, fontWeight: 700, color: '#111111', lineHeight: 1.2, textAlign: hasBullets ? 'left' : 'center', width: '100%' }}>
+              {card.title}
+            </p>
+          )}
+          {card.body && (
+            <p style={{ margin: hasBullets ? '0 0 16px' : '0', fontSize: 18, lineHeight: '28px', color: '#333333', whiteSpace: 'pre-wrap', textAlign: hasBullets ? 'left' : 'center' }}>
+              {card.body}
+            </p>
+          )}
+          {hasBullets && (
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {card.bullets!.map((bullet, i) => (
+                <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <span style={{ color: '#6C74FB', fontSize: 18, lineHeight: '26px', flexShrink: 0 }}>•</span>
+                  <span style={{ fontSize: 16, lineHeight: '26px', color: '#333333' }}>{bullet}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {card.url && (
+            <a
+              href={card.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                marginTop: 24,
+                display: 'inline-block',
+                padding: '8px 16px',
+                borderRadius: 12,
+                border: '1px solid #E5E5E5',
+                background: '#FFFFFF',
+                fontSize: 14,
+                color: '#111111',
+                textDecoration: 'none',
+              }}
+            >
+              Open link →
+            </a>
+          )}
+        </>
       )}
     </div>
   )
 }
 
-function Carousel({ cards }: { cards: CarouselCard[] }) {
+function Carousel({ cards, extraForLast }: { cards: CarouselCard[]; extraForLast?: React.ReactNode }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: 'center',
     containScroll: false,
@@ -431,7 +437,7 @@ function Carousel({ cards }: { cards: CarouselCard[] }) {
                       }}
                       onClick={!isActive ? () => emblaApi?.scrollTo(i) : undefined}
                     >
-                      <EmblaCarouselCard card={card} />
+                      <EmblaCarouselCard card={card} extra={i === cards.length - 1 ? extraForLast : undefined} />
                     </div>
                   </div>
                 )
@@ -528,6 +534,7 @@ export default function TryPage() {
     const mock = new URLSearchParams(window.location.search).get('mock')
     if (mock === 'true') { setIsMock(true); setStatus('done') }
     if (mock === 'loading') { setStatus('loading') }
+    if (mock === 'thisweek') { setIsMock(true); setStatus('done'); setActiveTab('one-action-this-week') }
   }, [])
 
   // Animate progress bar while loading — increments every 500ms, caps at 95
@@ -719,6 +726,107 @@ export default function TryPage() {
     const activeCards = resolvedTab === 'one-action-this-week'
       ? rawCards.map(card => /download|description/i.test(card.body) ? { ...card, url: watchUrl } : card)
       : rawCards
+    let extraContent: React.ReactNode
+    if (resolvedTab === 'one-action-this-week' && activeCards.length > 0) {
+      const defaultPrompt = `I just watched "${videoTitle}" and here's the one action I want to take this week:\n\n${activeCards[0].body}\n\nHelp me get started. What's the first concrete step I can take right now?`
+      const handleCopy = () => {
+        const text = promptRef.current?.value ?? defaultPrompt
+        navigator.clipboard.writeText(text)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }
+      const AI_PROVIDERS = [
+        { label: 'Claude', url: 'https://claude.ai/new', favicon: 'https://www.google.com/s2/favicons?domain=claude.ai&sz=64' },
+        { label: 'ChatGPT', url: 'https://chatgpt.com/', favicon: 'https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64' },
+        { label: 'Gemini', url: 'https://gemini.google.com/', favicon: 'https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64' },
+      ]
+      const showCopyBtn = hoveringPrompt || hoveringCopyBtn
+      extraContent = (
+        <>
+          <p style={{ margin: '0 0 20px', fontSize: 22, fontWeight: 700, color: '#111', textAlign: 'center' }}>
+            Use this as an AI prompt to get started
+          </p>
+          <div
+            style={{ position: 'relative' }}
+            onMouseEnter={() => setHoveringPrompt(true)}
+            onMouseLeave={() => setHoveringPrompt(false)}
+          >
+            <textarea
+              key={`prompt-${videoTitle}`}
+              ref={promptRef}
+              defaultValue={defaultPrompt}
+              rows={6}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '14px 44px 14px 14px',
+                border: '1px solid #E5E5E5',
+                borderRadius: 10,
+                fontSize: 15,
+                lineHeight: 1.6,
+                color: '#333',
+                background: '#FAFAFA',
+                resize: 'vertical',
+                fontFamily: 'inherit',
+                outline: 'none',
+              }}
+            />
+            {/* Copy icon — visible on hover */}
+            <div
+              style={{
+                position: 'absolute', top: 10, right: 10,
+                opacity: showCopyBtn ? 1 : 0,
+                transition: 'opacity 0.15s ease',
+              }}
+              onMouseEnter={() => setHoveringCopyBtn(true)}
+              onMouseLeave={() => setHoveringCopyBtn(false)}
+            >
+              {hoveringCopyBtn && !copied && (
+                <div style={{
+                  position: 'absolute', bottom: '100%', right: 0, marginBottom: 6,
+                  background: '#111', color: '#FFF', fontSize: 12, fontWeight: 500,
+                  padding: '4px 8px', borderRadius: 6, whiteSpace: 'nowrap', pointerEvents: 'none',
+                }}>
+                  Copy
+                </div>
+              )}
+              <button
+                onClick={handleCopy}
+                style={{
+                  background: '#F0F0F0',
+                  border: 'none',
+                  borderRadius: 7,
+                  width: 30, height: 30,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', padding: 0,
+                  color: copied ? '#22C55E' : '#666',
+                  transition: 'color 0.15s ease',
+                }}
+              >
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+              </button>
+            </div>
+          </div>
+
+          {/* AI provider icons — no border, just icons */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 28, marginTop: 24 }}>
+            {AI_PROVIDERS.map(({ label, url, favicon }) => (
+              <a
+                key={label}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={handleCopy}
+                title={`Open ${label}`}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
+              >
+                <img src={favicon} alt={label} style={{ width: 36, height: 36 }} />
+              </a>
+            ))}
+          </div>
+        </>
+      )
+    }
     const relevantResources = isMock ? MOCK_META.relevantResources : parseRelevantResources(result!.cardHtml)
 
     return (
@@ -741,110 +849,8 @@ export default function TryPage() {
 
         {/* Carousel */}
         <div style={{ width: '100%', marginBottom: 0 }}>
-          <Carousel key={resolvedTab} cards={activeCards} />
+          <Carousel key={resolvedTab} cards={activeCards} extraForLast={extraContent} />
         </div>
-
-        {/* This week — AI kickstarter */}
-        {resolvedTab === 'one-action-this-week' && activeCards.length > 0 && (() => {
-          const defaultPrompt = `I just watched "${videoTitle}" and here's the one action I want to take this week:\n\n${activeCards[0].body}\n\nHelp me get started. What's the first concrete step I can take right now?`
-          const handleCopy = () => {
-            const text = promptRef.current?.value ?? defaultPrompt
-            navigator.clipboard.writeText(text)
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
-          }
-          const AI_PROVIDERS = [
-            { label: 'Claude', url: 'https://claude.ai/new', favicon: 'https://www.google.com/s2/favicons?domain=claude.ai&sz=64' },
-            { label: 'ChatGPT', url: 'https://chatgpt.com/', favicon: 'https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64' },
-            { label: 'Gemini', url: 'https://gemini.google.com/', favicon: 'https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64' },
-          ]
-          const showCopyBtn = hoveringPrompt || hoveringCopyBtn
-          return (
-            <div style={{ width: CARD_WIDTH, marginTop: 40 }}>
-              {/* Editable prompt field */}
-              <div
-                style={{ position: 'relative' }}
-                onMouseEnter={() => setHoveringPrompt(true)}
-                onMouseLeave={() => setHoveringPrompt(false)}
-              >
-                <textarea
-                  key={`prompt-${videoTitle}`}
-                  ref={promptRef}
-                  defaultValue={defaultPrompt}
-                  rows={6}
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '16px',
-                    paddingRight: 44,
-                    border: '1px solid #E5E5E5',
-                    borderRadius: 12,
-                    fontSize: 15,
-                    lineHeight: 1.6,
-                    color: '#333',
-                    background: '#FFF',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                    outline: 'none',
-                  }}
-                />
-                {/* Copy icon — visible on hover */}
-                <div
-                  style={{
-                    position: 'absolute', top: 10, right: 10,
-                    opacity: showCopyBtn ? 1 : 0,
-                    transition: 'opacity 0.15s ease',
-                  }}
-                  onMouseEnter={() => setHoveringCopyBtn(true)}
-                  onMouseLeave={() => setHoveringCopyBtn(false)}
-                >
-                  {/* Tooltip */}
-                  {hoveringCopyBtn && !copied && (
-                    <div style={{
-                      position: 'absolute', bottom: '100%', right: 0, marginBottom: 6,
-                      background: '#111', color: '#FFF', fontSize: 12, fontWeight: 500,
-                      padding: '4px 8px', borderRadius: 6, whiteSpace: 'nowrap', pointerEvents: 'none',
-                    }}>
-                      Copy
-                    </div>
-                  )}
-                  <button
-                    onClick={handleCopy}
-                    style={{
-                      background: '#F5F5F5',
-                      border: '1px solid #E5E5E5',
-                      borderRadius: 8,
-                      width: 32, height: 32,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: 'pointer', padding: 0,
-                      color: copied ? '#22C55E' : '#555',
-                      transition: 'color 0.15s ease',
-                    }}
-                  >
-                    {copied ? <Check size={15} /> : <Copy size={15} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* AI provider icons */}
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginTop: 20 }}>
-                {AI_PROVIDERS.map(({ label, url, favicon }) => (
-                  <a
-                    key={label}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={handleCopy}
-                    title={`Open ${label}`}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 12, border: '1px solid #E5E5E5', background: '#FFF', textDecoration: 'none' }}
-                  >
-                    <img src={favicon} alt={label} style={{ width: 24, height: 24 }} />
-                  </a>
-                ))}
-              </div>
-            </div>
-          )
-        })()}
 
         {/* Inspired? quick links */}
         {relevantResources.length > 0 && (
