@@ -482,6 +482,17 @@ const PAGE: React.CSSProperties = {
   overflowX: 'hidden',
 }
 
+const LOADING_STEPS = [
+  'Deciding what\'s worth trying',
+  'Choosing what\'s worth knowing',
+  'Logging what to see differently',
+  'Calling out what not to bother with',
+  'Locking in something to start this week',
+]
+
+// Step thresholds — step N completes when progress passes these values
+const STEP_THRESHOLDS = [18, 36, 54, 72, 92]
+
 export default function TryPage() {
   const [videoUrl, setVideoUrl] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
@@ -489,13 +500,31 @@ export default function TryPage() {
   const [result, setResult] = useState<ExtractionResult | null>(null)
   const [isMock, setIsMock] = useState(false)
   const [activeTab, setActiveTab] = useState(TABS[0].key)
+  const [loadingProgress, setLoadingProgress] = useState(0)
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mock') === 'true') {
-      setIsMock(true)
-      setStatus('done')
-    }
+    if (typeof window === 'undefined') return
+    const mock = new URLSearchParams(window.location.search).get('mock')
+    if (mock === 'true') { setIsMock(true); setStatus('done') }
+    if (mock === 'loading') { setStatus('loading') }
   }, [])
+
+  // Animate progress bar while loading — increments every 500ms, caps at 95
+  useEffect(() => {
+    if (status !== 'loading') {
+      setLoadingProgress(0)
+      return
+    }
+    const interval = setInterval(() => {
+      setLoadingProgress((prev) => {
+        if (prev >= 95) return prev
+        // Targets ~75s to reach 95% — slows significantly in later stages
+        const increment = prev < 50 ? 0.9 : prev < 75 ? 0.5 : 0.2
+        return Math.min(95, prev + increment)
+      })
+    }, 500)
+    return () => clearInterval(interval)
+  }, [status])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -586,19 +615,76 @@ export default function TryPage() {
   // ── Loading state ──────────────────────────────────────────────────────────
 
   if (status === 'loading') {
+    const currentStep = STEP_THRESHOLDS.findIndex((t) => loadingProgress < t)
+    // currentStep === -1 means all steps done (progress >= last threshold)
+    const activeStep = currentStep === -1 ? LOADING_STEPS.length : currentStep
+
     return (
       <>
         <LogoHeader />
         <main style={{ ...PAGE, justifyContent: 'center' }}>
           <FormCard>
-            <h1 style={{ margin: '0 0 12px', fontSize: 32, fontWeight: 700, color: '#111', lineHeight: 1.2 }}>
+            <h1 style={{ margin: '0 0 28px', fontSize: 28, fontWeight: 700, color: '#111', lineHeight: 1.2 }}>
               Digestt some content
             </h1>
-            <p style={{ margin: 0, fontSize: 20, color: '#555', lineHeight: 1.5 }}>
-              Pulling out the highlights now — this usually takes about 30 seconds.
-            </p>
+
+            {/* Progress bar */}
+            <div style={{ width: '100%', marginBottom: 32 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 12, color: '#999', fontWeight: 500 }}>Progress</span>
+                <span style={{ fontSize: 12, color: '#999', fontWeight: 500 }}>{Math.round(loadingProgress)}%</span>
+              </div>
+              <div style={{ width: '100%', height: 6, background: '#EFEFEF', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${loadingProgress}%`,
+                  background: '#6C74FB',
+                  borderRadius: 3,
+                  transition: 'width 0.5s ease',
+                }} />
+              </div>
+            </div>
+
+            {/* Steps */}
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {LOADING_STEPS.map((label, i) => {
+                const done = i < activeStep
+                const active = i === activeStep
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {/* Status circle */}
+                    <div style={{
+                      width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                      border: done
+                        ? 'none'
+                        : active
+                          ? '2px solid #6C74FB'
+                          : '2px solid #DEDEDE',
+                      borderTopColor: active ? 'transparent' : undefined,
+                      background: done ? '#6C74FB' : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      animation: active ? 'digestt-spin 0.8s linear infinite' : 'none',
+                    }}>
+                      {done && (
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                          <path d="M2 6l3 3 5-5" stroke="#FFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
+                    <span style={{
+                      fontSize: 15,
+                      fontWeight: done || active ? 600 : 400,
+                      color: done ? '#111' : active ? '#6C74FB' : '#AAAAAA',
+                    }}>
+                      {label}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
           </FormCard>
         </main>
+        <style>{`@keyframes digestt-spin { to { transform: rotate(360deg); } }`}</style>
       </>
     )
   }
