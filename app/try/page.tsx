@@ -120,9 +120,10 @@ function parseCardHtml(cardHtml: string): ParsedField[] {
 
 // Each "card" is one displayable item (one li, or the full body for non-list fields)
 interface CarouselCard {
-  title: string    // bold heading in the card
-  body: string     // plain text content
-  url?: string     // optional link extracted from body text
+  title: string       // bold heading in the card
+  body: string        // lead sentence (first part before any | separators)
+  bullets?: string[]  // supporting details (parts after | separators)
+  url?: string        // optional link extracted from body text
 }
 
 function fieldToCards(field: ParsedField): CarouselCard[] {
@@ -136,8 +137,8 @@ function fieldToCards(field: ParsedField): CarouselCard[] {
     return text ? [{ title, body: text }] : []
   }
 
-  // List fields — each <li> becomes its own card
-  const liMatches = [...bodyHtml.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)]
+  // List fields — each <li> becomes its own card, capped at 5
+  const liMatches = [...bodyHtml.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)].slice(0, 5)
   if (liMatches.length > 0) {
     return liMatches.map((match) => {
       const content = match[1]
@@ -145,10 +146,13 @@ function fieldToCards(field: ParsedField): CarouselCard[] {
       // Primary: <strong>Title</strong>: body
       const boldMatch = content.match(/^<strong>([\s\S]*?)<\/strong>([\s\S]*)/)
       if (boldMatch) {
-        const title = boldMatch[1].replace(/<[^>]+>/g, '').trim()
+        const title = boldMatch[1].replace(/<[^>]+>/g, '').replace(/:\s*$/, '').trim()
         const rawBody = boldMatch[2].replace(/^\s*(?:[—–-]|:)\s*/, '').replace(/<[^>]+>/g, '').trim()
-        const body = rawBody.replace(/\*([^*\n]+)\*/g, '$1').replace(/\*/g, '')
-        return { title, body }
+        const cleaned = rawBody.replace(/\*([^*\n]+)\*/g, '$1').replace(/\*/g, '')
+        const parts = cleaned.split(' | ').map(s => s.trim()).filter(Boolean)
+        const body = parts[0] ?? ''
+        const bullets = parts.length > 1 ? parts.slice(1) : undefined
+        return { title, body, bullets }
       }
 
       // Fallback: strip asterisks and detect any URLs before title extraction
@@ -226,9 +230,9 @@ const MOCK_FIELDS: ParsedField[] = [
     key: 'techniques-worth-trying',
     label: 'Techniques worth trying',
     bodyHtml: [
-      li('<strong>Inflatable movie theater business model</strong>: Derek started with a $250–300 consumer inflatable screen from Amazon, evolved to a $3,500 commercial 20-foot screen from Alibaba.'),
-      li('<strong>Equipment breakdown</strong>: $1,100 projector, $3,000 for two JBL speakers, $3,500 for 20-foot commercial screen, total outdoor setup around $8,000–10,000.'),
-      li('<strong>LED dance floor expansion</strong>: $20,000 for 24x24 foot setup, charges $3,000 per rental, pays for itself after 6.67 rentals.'),
+      li('<strong>Start with a consumer screen, upgrade fast</strong>: Derek started with a $250–300 Amazon inflatable and quickly outgrew it | The $3,500 commercial 20-foot screen from Alibaba is the real product | Consumer grade won\'t hold up for repeat commercial use'),
+      li('<strong>Full outdoor setup cost breakdown</strong>: Budget around $8,000–10,000 all-in for a professional rig | $1,100 projector + $3,000 for two JBL speakers + $3,500 for the 20-foot screen | Source the screen from Alibaba, not Amazon'),
+      li('<strong>LED dance floor as upsell</strong>: $20,000 for a 24x24 foot setup | Charge $3,000 per rental — pays for itself after 7 bookings | Comes in 2-foot panels so you can configure 8x8, 16x6, or 24x24'),
     ].join(''),
     count: 3,
   },
@@ -275,6 +279,7 @@ const CARD_PADDING = 32
 const SLIDE_PADDING_X = 16 // padding on each side of the card inside its slide slot — gap between cards = 2× this
 
 function EmblaCarouselCard({ card }: { card: CarouselCard }) {
+  const hasBullets = card.bullets && card.bullets.length > 0
   return (
     <div style={{
       padding: CARD_PADDING,
@@ -282,17 +287,29 @@ function EmblaCarouselCard({ card }: { card: CarouselCard }) {
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',
-      alignItems: 'center',
-      textAlign: 'center',
+      alignItems: hasBullets ? 'flex-start' : 'center',
+      textAlign: hasBullets ? 'left' : 'center',
     }}>
       {card.title && (
-        <p style={{ margin: '0 0 16px', fontSize: 32, fontWeight: 700, color: '#111111', lineHeight: 1.2, textAlign: 'center' }}>
+        <p style={{ margin: '0 0 16px', fontSize: 28, fontWeight: 700, color: '#111111', lineHeight: 1.2, textAlign: hasBullets ? 'left' : 'center', width: '100%' }}>
           {card.title}
         </p>
       )}
-      <p style={{ margin: 0, fontSize: 20, lineHeight: '32px', color: '#333333', whiteSpace: 'pre-wrap', textAlign: 'center' }}>
-        {card.body}
-      </p>
+      {card.body && (
+        <p style={{ margin: hasBullets ? '0 0 16px' : '0', fontSize: 18, lineHeight: '28px', color: '#333333', whiteSpace: 'pre-wrap', textAlign: hasBullets ? 'left' : 'center' }}>
+          {card.body}
+        </p>
+      )}
+      {hasBullets && (
+        <ul style={{ margin: 0, padding: 0, listStyle: 'none', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {card.bullets!.map((bullet, i) => (
+            <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <span style={{ color: '#6C74FB', fontSize: 18, lineHeight: '26px', flexShrink: 0 }}>•</span>
+              <span style={{ fontSize: 16, lineHeight: '26px', color: '#333333' }}>{bullet}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       {card.url && (
         <a
           href={card.url}
@@ -645,46 +662,12 @@ export default function TryPage() {
               </div>
             </div>
 
-            {/* Steps */}
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {LOADING_STEPS.map((label, i) => {
-                const done = i < activeStep
-                const active = i === activeStep
-                return (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    {/* Status circle */}
-                    <div style={{
-                      width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-                      border: done
-                        ? 'none'
-                        : active
-                          ? '2px solid #6C74FB'
-                          : '2px solid #DEDEDE',
-                      borderTopColor: active ? 'transparent' : undefined,
-                      background: done ? '#6C74FB' : 'transparent',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      animation: active ? 'digestt-spin 0.8s linear infinite' : 'none',
-                    }}>
-                      {done && (
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                          <path d="M2 6l3 3 5-5" stroke="#FFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
-                    </div>
-                    <span style={{
-                      fontSize: 15,
-                      fontWeight: done || active ? 600 : 400,
-                      color: done ? '#111' : active ? '#6C74FB' : '#AAAAAA',
-                    }}>
-                      {label}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
+            {/* Current step */}
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#111', textAlign: 'center' }}>
+              {LOADING_STEPS[Math.min(activeStep, LOADING_STEPS.length - 1)]}
+            </p>
           </FormCard>
         </main>
-        <style>{`@keyframes digestt-spin { to { transform: rotate(360deg); } }`}</style>
       </>
     )
   }
@@ -712,10 +695,24 @@ export default function TryPage() {
       ? worthField.bodyHtml.replace(/<[^>]+>/g, '').trim()
       : ''
 
-    const activeField = fieldMap.get(activeTab)
+    // Only show tabs that have at least one card with real content
+    const visibleTabs = TABS.filter((tab) => {
+      const field = fieldMap.get(tab.key)
+      if (!field) return false
+      const cards = fieldToCards(field)
+      if (cards.length === 0) return false
+      // Hide tabs where the only card is a "nothing" placeholder
+      if (cards.length === 1 && /^nothing (notable|flagged)/i.test(cards[0].body)) return false
+      return true
+    })
+
+    // If the current activeTab isn't visible, default to the first visible tab
+    const resolvedTab = visibleTabs.find(t => t.key === activeTab)?.key ?? visibleTabs[0]?.key ?? activeTab
+
+    const activeField = fieldMap.get(resolvedTab)
     const rawCards = activeField ? fieldToCards(activeField) : []
     // For 'This week' cards that mention a download/description link, attach the video URL
-    const activeCards = activeTab === 'one-action-this-week'
+    const activeCards = resolvedTab === 'one-action-this-week'
       ? rawCards.map(card => /download|description/i.test(card.body) ? { ...card, url: watchUrl } : card)
       : rawCards
     const relevantResources = isMock ? MOCK_META.relevantResources : parseRelevantResources(result!.cardHtml)
@@ -740,7 +737,7 @@ export default function TryPage() {
 
         {/* Carousel */}
         <div style={{ width: '100%', marginBottom: 0 }}>
-          <Carousel key={activeTab} cards={activeCards} />
+          <Carousel key={resolvedTab} cards={activeCards} />
         </div>
 
         {/* Inspired? quick links */}
@@ -802,36 +799,29 @@ export default function TryPage() {
           </div>
         )}
 
-        {/* Try another */}
-        <div style={{ marginTop: 32 }}>
-          <button
-            onClick={() => { setStatus('idle'); setResult(null); setIsMock(false) }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#999', textDecoration: 'underline', padding: 0 }}
-          >
-            Try another video
-          </button>
-        </div>
       </main>
 
         {/* Fixed footer nav */}
         <div style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0, height: 64,
+          position: 'fixed', bottom: 0, left: 0, right: 0, height: 56,
           background: '#FFF', borderTop: '1px solid #E5E5E5', zIndex: 100,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24,
         }}>
-          {TABS.map((tab) => {
-            const isActive = tab.key === activeTab
+          {visibleTabs.map((tab) => {
+            const isActive = tab.key === resolvedTab
             return (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 style={{
-                  background: 'none',
+                  background: isActive ? '#E2E2E2' : 'none',
                   border: 'none',
-                  padding: 0,
-                  fontSize: 15,
-                  fontWeight: 700,
-                  color: isActive ? '#000000' : 'rgba(0,0,0,0.5)',
+                  borderRadius: isActive ? 8 : 0,
+                  padding: isActive ? '4px 8px' : '4px 8px',
+                  fontSize: 16,
+                  fontFamily: 'Avenir, "Avenir Next", sans-serif',
+                  fontWeight: 500,
+                  color: '#000',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
                 }}

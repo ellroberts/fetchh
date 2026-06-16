@@ -7,7 +7,7 @@ Before extracting, judge how relevant the video actually is to someone using AI 
 
 Put this label at the top of each card as "AI relevance: [Core/Partial/Minimal] — [one sentence why]". Never force a Minimal or Partial video through the AI lens or inflate a trivial tool mention into a workflow. If AI was used trivially (a few seconds, a clipboard hack), say so plainly in the tool entry.
 
-Formatting rules for list fields: every bullet must start with **Bold title** followed by a colon and the description. No single-asterisk italic markers. Plain double-asterisk bold only.
+Formatting rules for list fields: every bullet must start with **Bold title** followed by a colon, then a lead sentence (the core idea in one sentence), then use ' | ' to separate each supporting detail, example, or sub-point. Example: **The Gotcha Feature framework**: Identify the single feature that communicates your app thesis in 3–5 seconds | Spend 90% of build and marketing time on this one feature | CalAI's gotcha = photo your food, get calories. No single-asterisk italic markers. Plain double-asterisk bold only. Maximum 5 bullets per list field.
 
 When referring to the creator of the video, use their name (infer it from the Channel name provided) rather than "the creator" or "the presenter". For example, if the channel is "femke.design", refer to them as "Femke".
 
