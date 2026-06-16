@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { ArrowLeft, ArrowRight, Copy, Check } from 'lucide-react'
 import useEmblaCarousel from 'embla-carousel-react'
 import { Input } from '@/components/Input'
 import { Button } from '@/components/Button'
@@ -518,6 +518,10 @@ export default function TryPage() {
   const [isMock, setIsMock] = useState(false)
   const [activeTab, setActiveTab] = useState(TABS[0].key)
   const [loadingProgress, setLoadingProgress] = useState(0)
+  const [copied, setCopied] = useState(false)
+  const [hoveringPrompt, setHoveringPrompt] = useState(false)
+  const [hoveringCopyBtn, setHoveringCopyBtn] = useState(false)
+  const promptRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -739,6 +743,108 @@ export default function TryPage() {
         <div style={{ width: '100%', marginBottom: 0 }}>
           <Carousel key={resolvedTab} cards={activeCards} />
         </div>
+
+        {/* This week — AI kickstarter */}
+        {resolvedTab === 'one-action-this-week' && activeCards.length > 0 && (() => {
+          const defaultPrompt = `I just watched "${videoTitle}" and here's the one action I want to take this week:\n\n${activeCards[0].body}\n\nHelp me get started. What's the first concrete step I can take right now?`
+          const handleCopy = () => {
+            const text = promptRef.current?.value ?? defaultPrompt
+            navigator.clipboard.writeText(text)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+          }
+          const AI_PROVIDERS = [
+            { label: 'Claude', url: 'https://claude.ai/new', favicon: 'https://www.google.com/s2/favicons?domain=claude.ai&sz=64' },
+            { label: 'ChatGPT', url: 'https://chatgpt.com/', favicon: 'https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64' },
+            { label: 'Gemini', url: 'https://gemini.google.com/', favicon: 'https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64' },
+          ]
+          const showCopyBtn = hoveringPrompt || hoveringCopyBtn
+          return (
+            <div style={{ width: CARD_WIDTH, marginTop: 40 }}>
+              {/* Editable prompt field */}
+              <div
+                style={{ position: 'relative' }}
+                onMouseEnter={() => setHoveringPrompt(true)}
+                onMouseLeave={() => setHoveringPrompt(false)}
+              >
+                <textarea
+                  key={`prompt-${videoTitle}`}
+                  ref={promptRef}
+                  defaultValue={defaultPrompt}
+                  rows={6}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '16px',
+                    paddingRight: 44,
+                    border: '1px solid #E5E5E5',
+                    borderRadius: 12,
+                    fontSize: 15,
+                    lineHeight: 1.6,
+                    color: '#333',
+                    background: '#FFF',
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                    outline: 'none',
+                  }}
+                />
+                {/* Copy icon — visible on hover */}
+                <div
+                  style={{
+                    position: 'absolute', top: 10, right: 10,
+                    opacity: showCopyBtn ? 1 : 0,
+                    transition: 'opacity 0.15s ease',
+                  }}
+                  onMouseEnter={() => setHoveringCopyBtn(true)}
+                  onMouseLeave={() => setHoveringCopyBtn(false)}
+                >
+                  {/* Tooltip */}
+                  {hoveringCopyBtn && !copied && (
+                    <div style={{
+                      position: 'absolute', bottom: '100%', right: 0, marginBottom: 6,
+                      background: '#111', color: '#FFF', fontSize: 12, fontWeight: 500,
+                      padding: '4px 8px', borderRadius: 6, whiteSpace: 'nowrap', pointerEvents: 'none',
+                    }}>
+                      Copy
+                    </div>
+                  )}
+                  <button
+                    onClick={handleCopy}
+                    style={{
+                      background: '#F5F5F5',
+                      border: '1px solid #E5E5E5',
+                      borderRadius: 8,
+                      width: 32, height: 32,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', padding: 0,
+                      color: copied ? '#22C55E' : '#555',
+                      transition: 'color 0.15s ease',
+                    }}
+                  >
+                    {copied ? <Check size={15} /> : <Copy size={15} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* AI provider icons */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginTop: 20 }}>
+                {AI_PROVIDERS.map(({ label, url, favicon }) => (
+                  <a
+                    key={label}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={handleCopy}
+                    title={`Open ${label}`}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 12, border: '1px solid #E5E5E5', background: '#FFF', textDecoration: 'none' }}
+                  >
+                    <img src={favicon} alt={label} style={{ width: 24, height: 24 }} />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Inspired? quick links */}
         {relevantResources.length > 0 && (
