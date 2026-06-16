@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { ArrowLeft, ArrowRight, Copy, Check } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Copy, Check, Frown, Meh, Smile, Laugh } from 'lucide-react'
 import useEmblaCarousel from 'embla-carousel-react'
 import { Input } from '@/components/Input'
 import { Button } from '@/components/Button'
+import { IconButton } from '@/components/IconButton'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -126,12 +127,16 @@ interface CarouselCard {
   url?: string        // optional link extracted from body text
 }
 
+function normalizeDisplayText(text: string) {
+  return text.replace(/\s*—\s*/g, ', ').replace(/\s{2,}/g, ' ').trim()
+}
+
 function fieldToCards(field: ParsedField): CarouselCard[] {
   const { key, bodyHtml } = field
 
   // Single-text fields
   if (key === 'ai-relevance' || key === 'one-action-this-week' || key === 'worth-watching-in-full') {
-    const text = bodyHtml.replace(/<[^>]+>/g, '').replace(/\*([^*\n]+)\*/g, '$1').replace(/\*/g, '').trim()
+    const text = normalizeDisplayText(bodyHtml.replace(/<[^>]+>/g, '').replace(/\*([^*\n]+)\*/g, '$1').replace(/\*/g, '').trim())
     // 'one-action-this-week' has no specific title — the tab label already provides context
     const title = key === 'one-action-this-week' ? '' : (KEY_TO_DISPLAY[key] ?? field.label)
     return text ? [{ title, body: text }] : []
@@ -149,10 +154,10 @@ function fieldToCards(field: ParsedField): CarouselCard[] {
         const title = boldMatch[1].replace(/<[^>]+>/g, '').replace(/:\s*$/, '').trim()
         const rawBody = boldMatch[2].replace(/^\s*(?:[—–-]|:)\s*/, '').replace(/<[^>]+>/g, '').trim()
         const cleaned = rawBody.replace(/\*([^*\n]+)\*/g, '$1').replace(/\*/g, '')
-        const parts = cleaned.split(' | ').map(s => s.trim()).filter(Boolean)
+        const parts = cleaned.split(' | ').map(s => normalizeDisplayText(s.trim())).filter(Boolean)
         const body = parts[0] ?? ''
         const bullets = parts.length > 1 ? parts.slice(1) : undefined
-        return { title, body, bullets }
+        return { title: normalizeDisplayText(title), body, bullets }
       }
 
       // Fallback: strip asterisks and detect any URLs before title extraction
@@ -164,16 +169,16 @@ function fieldToCards(field: ParsedField): CarouselCard[] {
       // Fallback 1: "Title — body" em-dash pattern
       const dashMatch = plainText.match(/^(.+?)\s*[—–]\s*(.+)/s)
       if (dashMatch && dashMatch[1].length <= 80) {
-        return { title: dashMatch[1].trim(), body: dashMatch[2].trim(), url }
+        return { title: normalizeDisplayText(dashMatch[1].trim()), body: normalizeDisplayText(dashMatch[2].trim()), url }
       }
 
       // Fallback 2: "Title: body" colon pattern (no parens/dashes before colon)
       const colonMatch = plainText.match(/^([^:(—–\n]{3,50}):\s*(.+)/s)
       if (colonMatch) {
-        return { title: colonMatch[1].trim(), body: colonMatch[2].trim(), url }
+        return { title: normalizeDisplayText(colonMatch[1].trim()), body: normalizeDisplayText(colonMatch[2].trim()), url }
       }
 
-      return { title: '', body: plainText, url }
+      return { title: '', body: normalizeDisplayText(plainText), url }
     })
   }
 
@@ -187,9 +192,9 @@ function fieldToCards(field: ParsedField): CarouselCard[] {
     // Try em-dash split for a more specific title than the generic field label
     const dashMatch = fullText.match(/^(.+?)\s*[—–]\s*(.+)/s)
     if (dashMatch && dashMatch[1].length <= 80) {
-      return [{ title: dashMatch[1].trim(), body: dashMatch[2].trim() }]
+      return [{ title: normalizeDisplayText(dashMatch[1].trim()), body: normalizeDisplayText(dashMatch[2].trim()) }]
     }
-    return [{ title: field.label, body: fullText }]
+    return [{ title: field.label, body: normalizeDisplayText(fullText) }]
   }
 
   return []
@@ -213,6 +218,25 @@ function parseRelevantResources(cardHtml: string): Array<{ name: string; url: st
   const match = cardHtml.match(/RELEVANT_RESOURCES:\s*(\[[\s\S]*?\])/)
   if (!match) return []
   try { return JSON.parse(match[1]) } catch { return [] }
+}
+
+function resourceMatchesCard(resource: { name: string; url: string }, card?: CarouselCard) {
+  if (!card) return false
+  const cardText = [
+    card.title,
+    card.body,
+    ...(card.bullets ?? []),
+    card.url ?? '',
+  ].join(' ').toLowerCase()
+  const resourceName = resource.name.toLowerCase()
+  let resourceDomain = ''
+  try {
+    const host = new URL(resource.url).hostname.replace(/^www\./, '')
+    resourceDomain = host.split('.')[0]?.toLowerCase() ?? ''
+  } catch {
+    resourceDomain = resource.url.toLowerCase()
+  }
+  return cardText.includes(resourceName) || (!!resourceDomain && cardText.includes(resourceDomain))
 }
 
 function li(text: string) {
@@ -278,8 +302,8 @@ const CARD_PADDING = 32
 // Extra beyond CARD_WIDTH creates the gap between cards and allows peeking.
 const SLIDE_PADDING_X = 16 // padding on each side of the card inside its slide slot — gap between cards = 2× this
 
-function EmblaCarouselCard({ card, extra }: { card: CarouselCard; extra?: React.ReactNode }) {
-  const hasBullets = card.bullets && card.bullets.length > 0
+function EmblaCarouselCard({ card, extra }: { card?: CarouselCard; extra?: React.ReactNode }) {
+  const hasBullets = card?.bullets && card.bullets.length > 0
   return (
     <div style={{
       padding: CARD_PADDING,
@@ -294,12 +318,12 @@ function EmblaCarouselCard({ card, extra }: { card: CarouselCard; extra?: React.
         <div style={{ width: '100%' }}>{extra}</div>
       ) : (
         <>
-          {card.title && (
+          {card?.title && (
             <p style={{ margin: '0 0 16px', fontSize: 28, fontWeight: 700, color: '#111111', lineHeight: 1.2, textAlign: hasBullets ? 'left' : 'center', width: '100%' }}>
               {card.title}
             </p>
           )}
-          {card.body && (
+          {card?.body && (
             <p style={{ margin: hasBullets ? '0 0 16px' : '0', fontSize: 18, lineHeight: '28px', color: '#333333', whiteSpace: 'pre-wrap', textAlign: hasBullets ? 'left' : 'center' }}>
               {card.body}
             </p>
@@ -314,7 +338,7 @@ function EmblaCarouselCard({ card, extra }: { card: CarouselCard; extra?: React.
               ))}
             </ul>
           )}
-          {card.url && (
+          {card?.url && (
             <a
               href={card.url}
               target="_blank"
@@ -340,7 +364,17 @@ function EmblaCarouselCard({ card, extra }: { card: CarouselCard; extra?: React.
   )
 }
 
-function Carousel({ cards, extraForLast }: { cards: CarouselCard[]; extraForLast?: React.ReactNode }) {
+function Carousel({
+  cards,
+  extraForLast,
+  endCard,
+  onSelectedIndexChange,
+}: {
+  cards: CarouselCard[]
+  extraForLast?: React.ReactNode
+  endCard?: React.ReactNode
+  onSelectedIndexChange?: (index: number) => void
+}) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: 'center',
     containScroll: false,
@@ -350,8 +384,10 @@ function Carousel({ cards, extraForLast }: { cards: CarouselCard[]; extraForLast
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return
-    setSelectedIndex(emblaApi.selectedScrollSnap())
-  }, [emblaApi])
+    const nextIndex = emblaApi.selectedScrollSnap()
+    setSelectedIndex(nextIndex)
+    onSelectedIndexChange?.(nextIndex)
+  }, [emblaApi, onSelectedIndexChange])
 
   useEffect(() => {
     if (!emblaApi) return
@@ -360,8 +396,9 @@ function Carousel({ cards, extraForLast }: { cards: CarouselCard[]; extraForLast
     return () => { emblaApi.off('select', onSelect) }
   }, [emblaApi, onSelect])
 
+  const totalSlides = cards.length + (endCard ? 1 : 0)
   const canPrev = selectedIndex > 0
-  const canNext = selectedIndex < cards.length - 1
+  const canNext = selectedIndex < totalSlides - 1
 
   if (cards.length === 0) {
     return (
@@ -410,11 +447,13 @@ function Carousel({ cards, extraForLast }: { cards: CarouselCard[]; extraForLast
           {/* Embla viewport */}
           <div ref={emblaRef} style={{ overflow: 'hidden', width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'stretch' }}>
-              {cards.map((card, i) => {
+              {Array.from({ length: totalSlides }).map((_, i) => {
+                const card = cards[i]
                 const isActive = i === selectedIndex
+                const isEndCard = i === cards.length
                 return (
                   <div
-                    key={i}
+                    key={isEndCard ? 'feedback' : i}
                     style={{
                       flex: `0 0 ${CARD_WIDTH + SLIDE_PADDING_X * 2}px`,
                       paddingLeft: SLIDE_PADDING_X,
@@ -437,7 +476,10 @@ function Carousel({ cards, extraForLast }: { cards: CarouselCard[]; extraForLast
                       }}
                       onClick={!isActive ? () => emblaApi?.scrollTo(i) : undefined}
                     >
-                      <EmblaCarouselCard card={card} extra={i === cards.length - 1 ? extraForLast : undefined} />
+                      <EmblaCarouselCard
+                        card={card}
+                        extra={isEndCard ? endCard : i === cards.length - 1 ? extraForLast : undefined}
+                      />
                     </div>
                   </div>
                 )
@@ -470,8 +512,8 @@ function Carousel({ cards, extraForLast }: { cards: CarouselCard[]; extraForLast
       </div>
 
       {/* Pagination dots — below the carousel, hidden when only one card */}
-      {cards.length > 1 && <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 24 }}>
-        {cards.map((_, i) => (
+      {totalSlides > 1 && <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 24 }}>
+        {Array.from({ length: totalSlides }).map((_, i) => (
           <button
             key={i}
             onClick={() => emblaApi?.scrollTo(i)}
@@ -527,6 +569,9 @@ export default function TryPage() {
   const [copied, setCopied] = useState(false)
   const [hoveringPrompt, setHoveringPrompt] = useState(false)
   const [hoveringCopyBtn, setHoveringCopyBtn] = useState(false)
+  const [feedbackRating, setFeedbackRating] = useState<number | null>(null)
+  const [feedbackComment, setFeedbackComment] = useState('')
+  const [carouselSelectedIndex, setCarouselSelectedIndex] = useState(0)
   const promptRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -696,14 +741,14 @@ export default function TryPage() {
     const youtubeUrl = isMock ? MOCK_META.youtubeUrl : `https://www.youtube.com/watch?v=${result!.videoId}`
     const watchUrl = isMock ? MOCK_META.watchUrl : `https://www.youtube.com/watch?v=${result!.videoId}`
 
-    const videoTitle = isMock ? MOCK_META.videoTitle : result!.videoTitle
+    const videoTitle = normalizeDisplayText(isMock ? MOCK_META.videoTitle : result!.videoTitle)
     const channelName = isMock ? MOCK_META.channelName : result!.channelName
     const channelInitial = channelName.charAt(0).toUpperCase()
 
     const fieldMap = new Map(fields.map((f) => [f.key, f]))
     const worthField = fieldMap.get('worth-watching-in-full')
     const worthText = worthField
-      ? worthField.bodyHtml.replace(/<[^>]+>/g, '').trim()
+      ? normalizeDisplayText(worthField.bodyHtml.replace(/<[^>]+>/g, '').trim())
       : ''
 
     // Only show tabs that have at least one card with real content
@@ -827,7 +872,69 @@ export default function TryPage() {
         </>
       )
     }
+    const feedbackOptions = [
+      { value: 1, label: 'Not helpful', icon: Frown },
+      { value: 2, label: 'A little helpful', icon: Meh },
+      { value: 3, label: 'Helpful', icon: Smile },
+      { value: 4, label: 'Very helpful', icon: Laugh },
+    ]
+    const feedbackCard = activeCards.length > 1 ? (
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+        <p style={{ margin: '0 0 12px', fontSize: 22, fontWeight: 700, color: '#333', lineHeight: 1.3 }}>
+          Have these cards been helpful?
+        </p>
+        <p style={{ margin: '0 0 32px', fontSize: 15, color: '#333', lineHeight: 1.6, maxWidth: 420 }}>
+          If you&apos;ve any ideas or suggestion to improve the output please let us know. Thanks!
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 32 }}>
+          {feedbackOptions.map(({ value, label, icon: Icon }) => {
+            const selected = feedbackRating === value
+            return (
+              <IconButton
+                key={value}
+                onClick={() => setFeedbackRating(value)}
+                tooltip={label}
+                title={label}
+                size="md"
+                variant="ghost"
+                selected={selected}
+                style={{
+                  color: selected ? '#6C74FB' : '#777',
+                  backgroundColor: selected ? '#F0F0FF' : 'transparent',
+                  borderRadius: 999,
+                }}
+              >
+                <Icon size={22} />
+              </IconButton>
+            )
+          })}
+        </div>
+        <Input
+          multiline
+          rows={4}
+          placeholder="Add a comment"
+          value={feedbackComment}
+          onChange={(e) => setFeedbackComment((e.target as HTMLTextAreaElement).value)}
+          inputStyle={{ minHeight: 96, resize: 'none', backgroundColor: '#FFF' }}
+          style={{ width: '100%', marginBottom: 16 }}
+        />
+        <Button
+          type="button"
+          variant="primary"
+          size="lg"
+          onClick={() => {}}
+          style={{ width: '100%' }}
+        >
+          Send
+        </Button>
+      </div>
+    ) : undefined
     const relevantResources = isMock ? MOCK_META.relevantResources : parseRelevantResources(result!.cardHtml)
+    const activeContentCard = carouselSelectedIndex < activeCards.length
+      ? activeCards[carouselSelectedIndex]
+      : undefined
+    const activeRelevantResources = relevantResources.filter((resource) => resourceMatchesCard(resource, activeContentCard))
+    const showQuickLinks = resolvedTab !== 'one-action-this-week' && activeRelevantResources.length > 0
 
     return (
       <>
@@ -849,17 +956,23 @@ export default function TryPage() {
 
         {/* Carousel */}
         <div style={{ width: '100%', marginBottom: 0 }}>
-          <Carousel key={resolvedTab} cards={activeCards} extraForLast={extraContent} />
+          <Carousel
+            key={resolvedTab}
+            cards={activeCards}
+            extraForLast={extraContent}
+            endCard={feedbackCard}
+            onSelectedIndexChange={setCarouselSelectedIndex}
+          />
         </div>
 
         {/* Inspired? quick links */}
-        {relevantResources.length > 0 && (
+        {showQuickLinks && (
           <div style={{ width: CARD_WIDTH, marginTop: 48, textAlign: 'center' }}>
             <p style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 400, color: '#000' }}>
               Inspired? Here&apos;s some quick links
             </p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-              {relevantResources.map((resource) => (
+              {activeRelevantResources.map((resource) => (
                 <a
                   key={resource.name}
                   href={resource.url}
@@ -887,7 +1000,6 @@ export default function TryPage() {
         {worthText && (
           <div style={{
             width: CARD_WIDTH,
-            background: 'rgba(255,255,255,0.8)',
             borderRadius: CARD_RADIUS,
             padding: CARD_PADDING,
             marginTop: 48,
