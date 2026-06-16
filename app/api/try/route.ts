@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { getVideoMeta, getTranscript, extractWithClaude, cardToHtml } from '@/lib/digest-pipeline'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 function extractVideoId(url: string): string | null {
   const match = url.match(
@@ -16,11 +10,7 @@ function extractVideoId(url: string): string | null {
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const { email, videoUrl } = body as { email: string; videoUrl: string }
-
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return NextResponse.json({ error: 'A valid email address is required.' }, { status: 400 })
-  }
+  const { videoUrl } = body as { videoUrl: string }
 
   if (!videoUrl?.trim()) {
     return NextResponse.json({ error: 'A YouTube video URL is required.' }, { status: 400 })
@@ -55,11 +45,6 @@ export async function POST(req: Request) {
     console.error('extractWithClaude failed:', err)
     return NextResponse.json({ error: 'Extraction failed. Please try again.' }, { status: 500 })
   }
-
-  // Upsert email as lead capture (ignore conflict on email)
-  await supabase
-    .from('digest_signups')
-    .upsert({ email: email.trim().toLowerCase(), channels: [] }, { onConflict: 'email', ignoreDuplicates: true })
 
   return NextResponse.json({
     videoId,

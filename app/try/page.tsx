@@ -483,7 +483,6 @@ const PAGE: React.CSSProperties = {
 }
 
 export default function TryPage() {
-  const [email, setEmail] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
@@ -508,7 +507,7 @@ export default function TryPage() {
       const res = await fetch('/api/try', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, videoUrl }),
+        body: JSON.stringify({ videoUrl }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -524,15 +523,27 @@ export default function TryPage() {
     }
   }
 
-  // ── Loading ────────────────────────────────────────────────────────────────
+  // ── Shared components ──────────────────────────────────────────────────────
 
+  // Logo-only header — used on form and loading states
+  const LogoHeader = () => (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, height: 56,
+      background: '#FFF', borderBottom: '1px solid #E5E5E5', zIndex: 100,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <img src="/digestt-logo.svg" alt="Digestt" style={{ height: 24 }} />
+    </div>
+  )
+
+  // Full header — used on results page with video info
   const FixedHeader = ({ videoTitle, channelName, channelInitial }: { videoTitle?: string; channelName?: string; channelInitial?: string }) => (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, height: 56,
       background: '#FFF', borderBottom: '1px solid #E5E5E5', zIndex: 100,
       display: 'flex', alignItems: 'center', paddingLeft: 24, paddingRight: 24,
     }}>
-      <span style={{ fontSize: 24, fontWeight: 700, color: '#111', letterSpacing: '0.08em', flexShrink: 0 }}>Digestt</span>
+      <img src="/digestt-logo.svg" alt="Digestt" style={{ height: 20, flexShrink: 0 }} />
       {videoTitle && (
         <span style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 16px' }}>
           {videoTitle}
@@ -553,12 +564,40 @@ export default function TryPage() {
     </div>
   )
 
+  // Shared card shell used by form and loading states
+  const FormCard = ({ children }: { children: React.ReactNode }) => (
+    <div style={{
+      background: '#FFFFFF',
+      border: '1px solid #E5E5E5',
+      borderRadius: 12,
+      padding: '40px 32px',
+      width: '100%',
+      maxWidth: 480,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      textAlign: 'center',
+    }}>
+      <img src="/coda_cheeky.svg" alt="" style={{ width: 64, height: 64, marginBottom: 24 }} />
+      {children}
+    </div>
+  )
+
+  // ── Loading state ──────────────────────────────────────────────────────────
+
   if (status === 'loading') {
     return (
       <>
-        <FixedHeader />
+        <LogoHeader />
         <main style={{ ...PAGE, justifyContent: 'center' }}>
-          <p style={{ margin: 0, fontSize: 16, color: '#555' }}>Analysing video…</p>
+          <FormCard>
+            <h1 style={{ margin: '0 0 12px', fontSize: 32, fontWeight: 700, color: '#111', lineHeight: 1.2 }}>
+              Digestt some content
+            </h1>
+            <p style={{ margin: 0, fontSize: 20, color: '#555', lineHeight: 1.5 }}>
+              Pulling out the highlights now — this usually takes about 30 seconds.
+            </p>
+          </FormCard>
         </main>
       </>
     )
@@ -724,41 +763,32 @@ export default function TryPage() {
 
   return (
     <>
-      <FixedHeader />
-      <main style={{ ...PAGE, justifyContent: 'flex-start' }}>
-      <div style={{ width: '100%', maxWidth: 480 }}>
-        <h1 style={{ margin: '0 0 8px', fontSize: 28, fontWeight: 700, color: '#111' }}>
-          Try it on a video
-        </h1>
-        <p style={{ margin: '0 0 28px', fontSize: 16, color: '#555', lineHeight: 1.5 }}>
-          Paste any YouTube video URL and get an instant extraction.
-        </p>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <Input
-            type="email"
-            label="Your email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail((e.target as HTMLInputElement).value)}
-            required
-            autoComplete="email"
-          />
-          <Input
-            type="text"
-            label="YouTube video URL"
-            placeholder="https://www.youtube.com/watch?v=..."
-            value={videoUrl}
-            onChange={(e) => setVideoUrl((e.target as HTMLInputElement).value)}
-            required
-          />
-          {status === 'error' && (
-            <p style={{ margin: 0, fontSize: 14, color: '#dc2626' }}>{errorMsg}</p>
-          )}
-          <Button type="submit" variant="primary" size="lg" style={{ width: '100%' }}>
-            Get digest
-          </Button>
-        </form>
-      </div>
+      <LogoHeader />
+      <main style={{ ...PAGE, justifyContent: 'center' }}>
+        <FormCard>
+          <h1 style={{ margin: '0 0 12px', fontSize: 32, fontWeight: 700, color: '#111', lineHeight: 1.2 }}>
+            Digestt some content
+          </h1>
+          <p style={{ margin: '0 0 28px', fontSize: 20, color: '#555', lineHeight: 1.5 }}>
+            Get the highlights. See if it&apos;s worth watching in full.
+          </p>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', textAlign: 'left' }}>
+            <Input
+              type="text"
+              label="YouTube video"
+              placeholder="https://www.youtube.com/watch?v=..."
+              value={videoUrl}
+              onChange={(e) => setVideoUrl((e.target as HTMLInputElement).value)}
+              required
+            />
+            {status === 'error' && (
+              <p style={{ margin: 0, fontSize: 14, color: '#dc2626' }}>{errorMsg}</p>
+            )}
+            <Button type="submit" variant="primary" size="lg" style={{ width: '100%' }}>
+              Lets go
+            </Button>
+          </form>
+        </FormCard>
       </main>
     </>
   )
