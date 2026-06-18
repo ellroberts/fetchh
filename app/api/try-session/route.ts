@@ -21,9 +21,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid niche.' }, { status: 400 })
   }
 
+  const normalizedEmail = email.trim().toLowerCase()
+
+  // Reuse existing session for this email
+  const { data: existing } = await supabase
+    .from('try_sessions')
+    .select('token, try_count')
+    .eq('email', normalizedEmail)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (existing) {
+    if (existing.try_count >= 3) {
+      return NextResponse.json({ error: 'limit_reached' }, { status: 403 })
+    }
+    return NextResponse.json({ token: existing.token })
+  }
+
   const { data, error } = await supabase
     .from('try_sessions')
-    .insert({ email: email.trim().toLowerCase(), niche })
+    .insert({ email: normalizedEmail, niche })
     .select('token')
     .single()
 

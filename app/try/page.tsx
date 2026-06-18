@@ -28,7 +28,7 @@ export default function TryPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [niche, setNiche] = useState<Niche>('builders')
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'error' | 'limit_reached'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,6 +44,10 @@ export default function TryPage() {
       })
       const data = await res.json()
       if (!res.ok) {
+        if (res.status === 403 && data.error === 'limit_reached') {
+          setStatus('limit_reached')
+          return
+        }
         setErrorMsg(data.error || 'Something went wrong.')
         setStatus('error')
         return
@@ -53,6 +57,44 @@ export default function TryPage() {
       setErrorMsg('Something went wrong. Please try again.')
       setStatus('error')
     }
+  }
+
+  if (status === 'limit_reached') {
+    return (
+      <>
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, height: 56,
+          background: '#FFF', borderBottom: '1px solid #E5E5E5', zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <img src="/digestt-logo.svg" alt="Digestt" style={{ height: 24 }} />
+        </div>
+        <main style={PAGE}>
+          <div style={{
+            background: '#FFFFFF', border: '1px solid #E5E5E5', borderRadius: 12,
+            padding: '40px 32px', width: '100%', maxWidth: 480,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+          }}>
+            <h1 style={{ margin: '0 0 12px', fontSize: 28, fontWeight: 700, color: '#111', lineHeight: 1.2 }}>
+              That&apos;s your 3 free previews
+            </h1>
+            <p style={{ margin: '0 0 28px', fontSize: 16, color: '#555', lineHeight: 1.5 }}>
+              Want a weekly digest of your channels? Sign up and get this every Monday.
+            </p>
+            <a
+              href={`/?email=${encodeURIComponent(email.trim().toLowerCase())}`}
+              style={{
+                display: 'block', width: '100%', padding: '14px 0', borderRadius: 8,
+                background: '#6C74FB', color: '#FFF', fontSize: 16, fontWeight: 600,
+                textDecoration: 'none', textAlign: 'center',
+              }}
+            >
+              Sign up free →
+            </a>
+          </div>
+        </main>
+      </>
+    )
   }
 
   return (
