@@ -11,23 +11,23 @@ const VALID_NICHES: Niche[] = ['designers', 'builders', 'general']
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const { email, niche } = body as { email: string; niche: string }
+  const { name, niche } = body as { name: string; niche: string }
 
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return NextResponse.json({ error: 'A valid email address is required.' }, { status: 400 })
+  if (!name || !name.trim()) {
+    return NextResponse.json({ error: 'Please enter your name.' }, { status: 400 })
   }
 
   if (!VALID_NICHES.includes(niche as Niche)) {
     return NextResponse.json({ error: 'Invalid niche.' }, { status: 400 })
   }
 
-  const normalizedEmail = email.trim().toLowerCase()
+  const identifier = name.trim()
 
-  // Reuse existing session for this email
+  // Reuse existing session for this identifier
   const { data: existing } = await supabase
     .from('try_sessions')
     .select('token, try_count')
-    .eq('email', normalizedEmail)
+    .eq('email', identifier)
     .order('created_at', { ascending: false })
     .limit(1)
     .single()
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
 
   const { data, error } = await supabase
     .from('try_sessions')
-    .insert({ email: normalizedEmail, niche })
+    .insert({ email: identifier, niche })
     .select('token')
     .single()
 

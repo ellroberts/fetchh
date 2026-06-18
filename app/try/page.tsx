@@ -26,7 +26,7 @@ const PAGE: React.CSSProperties = {
 
 export default function TryPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
   const [niche, setNiche] = useState<Niche>('builders')
   const [status, setStatus] = useState<'idle' | 'submitting' | 'error' | 'limit_reached'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
@@ -40,7 +40,7 @@ export default function TryPage() {
       const res = await fetch('/api/try-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), niche }),
+        body: JSON.stringify({ name: name.trim(), niche }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -52,7 +52,7 @@ export default function TryPage() {
         setStatus('error')
         return
       }
-      router.push(`/try/${data.token}?niche=${niche}&email=${encodeURIComponent(email.trim().toLowerCase())}`)
+      router.push(`/try/${data.token}?niche=${niche}&name=${encodeURIComponent(name.trim())}`)
     } catch {
       setErrorMsg('Something went wrong. Please try again.')
       setStatus('error')
@@ -82,7 +82,7 @@ export default function TryPage() {
               Want a weekly digest of your channels? Sign up and get this every Monday.
             </p>
             <a
-              href={`/?email=${encodeURIComponent(email.trim().toLowerCase())}`}
+              href="/"
               style={{
                 display: 'block', width: '100%', padding: '14px 0', borderRadius: 8,
                 background: '#6C74FB', color: '#FFF', fontSize: 16, fontWeight: 600,
@@ -132,13 +132,12 @@ export default function TryPage() {
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', textAlign: 'left' }}>
             <Input
-              type="email"
-              label="Your email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail((e.target as HTMLInputElement).value)}
+              type="text"
+              label="Your name"
+              placeholder="e.g. Sarah"
+              value={name}
+              onChange={(e) => setName((e.target as HTMLInputElement).value)}
               required
-              autoComplete="email"
             />
 
             {/* Niche pill toggle */}

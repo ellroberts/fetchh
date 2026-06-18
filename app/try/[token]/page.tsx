@@ -475,11 +475,11 @@ const PAGE: React.CSSProperties = {
 }
 
 const LOADING_STEPS = [
-  "Deciding what's worth trying",
-  "Choosing what's worth knowing",
-  "Logging what to see differently",
-  "Calling out what not to bother with",
-  "Locking in something to start this week",
+  "Watching the whole thing so you don't have to...",
+  "Sifting out what's actually worth knowing...",
+  "Finding the idea worth stealing this week...",
+  "Calling out what to skip (you're welcome)...",
+  "Almost done — pulling it all together...",
 ]
 const STEP_THRESHOLDS = [18, 36, 54, 72, 92]
 
@@ -488,7 +488,7 @@ export default function TryTokenPage() {
   const searchParams = useSearchParams()
   const token = params.token as string
   const niche = searchParams.get('niche') ?? 'builders'
-  const email = searchParams.get('email') ?? ''
+  const name = searchParams.get('name') ?? ''
 
   const [videoUrl, setVideoUrl] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error' | 'limit_reached'>('idle')
@@ -502,6 +502,7 @@ export default function TryTokenPage() {
   const [hoveringCopyBtn, setHoveringCopyBtn] = useState(false)
   const [feedbackRating, setFeedbackRating] = useState<number | null>(null)
   const [feedbackComment, setFeedbackComment] = useState('')
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const [carouselSelectedIndex, setCarouselSelectedIndex] = useState(0)
   const promptRef = useRef<HTMLTextAreaElement>(null)
 
@@ -601,7 +602,7 @@ export default function TryTokenPage() {
   // ── Limit reached ──────────────────────────────────────────────────────────
 
   if (status === 'limit_reached') {
-    const signupUrl = `/?email=${encodeURIComponent(email)}`
+    const signupUrl = '/'
     return (
       <>
         <LogoHeader />
@@ -710,7 +711,7 @@ export default function TryTokenPage() {
       const showCopyBtn = hoveringPrompt || hoveringCopyBtn
       extraContent = (
         <>
-          <p style={{ margin: '0 0 20px', fontSize: 22, fontWeight: 700, color: '#111', textAlign: 'center' }}>
+          <p style={{ margin: '0 0 20px', fontSize: 28, fontWeight: 700, color: '#111', textAlign: 'center' }}>
             Use this as an AI prompt to get started
           </p>
           <div style={{ position: 'relative' }} onMouseEnter={() => setHoveringPrompt(true)} onMouseLeave={() => setHoveringPrompt(false)}>
@@ -756,7 +757,7 @@ export default function TryTokenPage() {
     ]
     const feedbackCard = activeCards.length > 1 ? (
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-        <p style={{ margin: '0 0 12px', fontSize: 22, fontWeight: 700, color: '#333', lineHeight: 1.3 }}>Have these cards been helpful?</p>
+        <p style={{ margin: '0 0 12px', fontSize: 28, fontWeight: 700, color: '#333', lineHeight: 1.3 }}>Have these cards been helpful?</p>
         <p style={{ margin: '0 0 32px', fontSize: 15, color: '#333', lineHeight: 1.6, maxWidth: 420 }}>If you&apos;ve any ideas or suggestion to improve the output please let us know. Thanks!</p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 32 }}>
           {feedbackOptions.map(({ value, label, icon: Icon }) => {
@@ -768,8 +769,25 @@ export default function TryTokenPage() {
             )
           })}
         </div>
-        <Input multiline rows={4} placeholder="Add a comment" value={feedbackComment} onChange={(e) => setFeedbackComment((e.target as HTMLTextAreaElement).value)} inputStyle={{ minHeight: 96, resize: 'none', backgroundColor: '#FFF' }} style={{ width: '100%', marginBottom: 16 }} />
-        <Button type="button" variant="primary" size="lg" onClick={() => {}} style={{ width: '100%' }}>Send</Button>
+        {feedbackSubmitted ? (
+          <p style={{ margin: 0, fontSize: 16, color: '#555' }}>Thanks for the feedback!</p>
+        ) : (
+          <>
+            <Input multiline rows={4} placeholder="Add a comment" value={feedbackComment} onChange={(e) => setFeedbackComment((e.target as HTMLTextAreaElement).value)} inputStyle={{ minHeight: 96, resize: 'none', backgroundColor: '#FFF' }} style={{ width: '100%', marginBottom: 16 }} />
+            <Button type="button" variant="primary" size="lg" onClick={async () => {
+              try {
+                await fetch('/api/try-feedback', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ token, rating: feedbackRating, comment: feedbackComment }),
+                })
+                setFeedbackSubmitted(true)
+              } catch {
+                // silently fail — feedback is best-effort
+              }
+            }}>Send</Button>
+          </>
+        )}
       </div>
     ) : undefined
 
@@ -836,7 +854,7 @@ export default function TryTokenPage() {
       <main style={{ ...PAGE, justifyContent: 'center' }}>
         <FormCard>
           <h1 style={{ margin: '0 0 12px', fontSize: 32, fontWeight: 700, color: '#111', lineHeight: 1.2 }}>
-            Digestt some content
+            Digestt
           </h1>
           <p style={{ margin: '0 0 28px', fontSize: 20, color: '#555', lineHeight: 1.5 }}>
             Get a quick summary on a YouTube video
