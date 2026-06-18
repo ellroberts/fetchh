@@ -1,13 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Input } from '@/components/Input'
 import { Button } from '@/components/Button'
 
 const MAX_CHANNELS = 15
 
 export default function Home() {
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
+
+  useEffect(() => {
+    const prefill = searchParams.get('email')
+    if (prefill) setEmail(decodeURIComponent(prefill))
+  }, [searchParams])
   const [channels, setChannels] = useState<string[]>(['', ''])
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')

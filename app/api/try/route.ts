@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { getVideoMeta, getTranscript, extractWithClaude, cardToHtml } from '@/lib/digest-pipeline'
 import { EXTRACTION_PROMPT_DESIGNERS, EXTRACTION_PROMPT_BUILDERS, EXTRACTION_PROMPT_GENERAL } from '@/lib/extraction-prompt'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 type Niche = 'designers' | 'builders' | 'general'
 
@@ -19,11 +25,36 @@ function extractVideoId(url: string): string | null {
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const { videoUrl, niche = 'designers' } = body as { videoUrl: string; niche?: Niche }
+  const { videoUrl, token } = body as { videoUrl: string; token: string }
 
   if (!videoUrl?.trim()) {
     return NextResponse.json({ error: 'A YouTube video URL is required.' }, { status: 400 })
   }
+
+  if (!token) {
+    return NextResponse.json({ error: 'Session token is required.' }, { status: 400 })
+  }
+
+  // Look up session
+  const { data: session, error: sessionError } = await supabase
+    .from('try_sessions')
+    .select('token, niche, try_count')
+    .eq('token', token)
+    .single()
+
+  if (sessionError || !session) {
+    return NextResponse.json({ error: 'Session not found.' }, { status: 404 })
+  }
+
+  if (session.try_count >= 3) {
+    return NextResponse.json({ error: 'limit_reached' }, { status: 403 })
+  }
+
+  // Increment try_count
+  await supabase
+    .from('try_sessions')
+    .update({ try_count: session.try_count + 1 })
+    .eq('token', token)
 
   const videoId = extractVideoId(videoUrl.trim())
   if (!videoId) {
@@ -46,7 +77,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: msg }, { status: 422 })
   }
 
-  // Select prompt based on niche
+  // Select prompt based on niche from session
+  const niche = session.niche as Niche
   const prompt = PROMPT_BY_NICHE[niche] ?? EXTRACTION_PROMPT_DESIGNERS
 
   // Run extraction
