@@ -214,6 +214,12 @@ export function cardToHtml(cardText: string): string {
       out.push(`<p style="${LABEL_STYLE}">${inlineMarkdown(text)}</p>`)
       continue
     }
+    const boldLineMatch = line.trim().match(/^\*\*(.+)\*\*$/)
+    if (boldLineMatch) {
+      const inner = boldLineMatch[1].replace(/^\d+\.\s*/, '')
+      out.push(`<p style="${LABEL_STYLE}">${inlineMarkdown(inner)}</p>`)
+      continue
+    }
     if (/^[-*•]\s/.test(line)) {
       out.push(`<li style="margin:3px 0;font-size:15px;color:#374151;line-height:1.6;">${inlineMarkdown(line.slice(2).trim())}</li>`)
       continue
