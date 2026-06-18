@@ -82,10 +82,10 @@ export default function TryPage() {
           <img src="/coda_cheeky.svg" alt="" style={{ width: 64, height: 64, marginBottom: 24 }} />
 
           <h1 style={{ margin: '0 0 12px', fontSize: 28, fontWeight: 700, color: '#111', lineHeight: 1.2 }}>
-            Try Digestt free
+            Digestt
           </h1>
           <p style={{ margin: '0 0 28px', fontSize: 16, color: '#555', lineHeight: 1.5 }}>
-            Get AI-filtered takeaways from any YouTube video. Pick what fits you best.
+            Get a quick summary on a YouTube video
           </p>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', textAlign: 'left' }}>
@@ -141,7 +141,7 @@ export default function TryPage() {
               loading={status === 'submitting'}
               style={{ width: '100%' }}
             >
-              Get started →
+              Continue →
             </Button>
           </form>
         </div>

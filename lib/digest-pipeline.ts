@@ -169,7 +169,7 @@ export async function extractWithClaude(
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 2048,
+      max_tokens: 4096,
       messages: [{ role: 'user', content: userContent }],
     }),
   })

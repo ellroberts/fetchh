@@ -90,6 +90,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Extraction failed. Please try again.' }, { status: 500 })
   }
 
+  console.log('[try] niche:', niche, '| card length:', card.length, '| preview:', card.slice(0, 300))
+
   return NextResponse.json({
     videoId,
     videoTitle,

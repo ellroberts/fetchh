@@ -639,7 +639,7 @@ export default function TryTokenPage() {
         <main style={{ ...PAGE, justifyContent: 'center' }}>
           <FormCard>
             <h1 style={{ margin: '0 0 28px', fontSize: 28, fontWeight: 700, color: '#111', lineHeight: 1.2 }}>
-              Digestt some content
+              Digestt
             </h1>
             <div style={{ width: '100%', marginBottom: 32 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -839,7 +839,7 @@ export default function TryTokenPage() {
             Digestt some content
           </h1>
           <p style={{ margin: '0 0 28px', fontSize: 20, color: '#555', lineHeight: 1.5 }}>
-            Get the highlights. See if it&apos;s worth watching in full.
+            Get a quick summary on a YouTube video
           </p>
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', textAlign: 'left' }}>
             <Input
