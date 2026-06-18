@@ -89,7 +89,7 @@ Before extracting, judge how relevant the video actually is to someone following
 
 Put this label at the top of each card as "AI relevance: [Core/Partial/Minimal] — [one sentence why]". Never force a Minimal or Partial video through the AI lens.
 
-Formatting rules for list fields: every bullet must start with **Bold title** followed by a colon, then a lead sentence (the core idea in one sentence), then use ' | ' to separate each supporting detail, example, or sub-point. No single-asterisk italic markers. Plain double-asterisk bold only. Maximum 5 bullets per list field.
+Formatting rules for list fields — these are mandatory, no exceptions: every bullet must start with **Bold title** followed by a colon, then a lead sentence (the core idea in plain English, one sentence), then use ' | ' to separate each supporting detail. Example: **ChatGPT Voice Mode**: Talk to ChatGPT hands-free on your phone using the mobile app | Tap the headphone icon in the bottom right | Works best for quick questions while commuting. No single-asterisk italic markers. Plain double-asterisk bold only. Maximum 5 bullets per list field. Do not write flowing prose paragraphs for list fields — use the bullet format above even if the content feels conversational.
 
 When referring to the creator of the video, use their name (inferred from the channel name) rather than "the creator" or "the presenter".
 
