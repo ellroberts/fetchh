@@ -8,6 +8,7 @@ const supabase = createClient(
 )
 
 export async function POST(req: Request) {
+  console.log('RESEND_FROM_EMAIL:', process.env.RESEND_FROM_EMAIL)
   const body = await req.json()
   const { email, channels } = body as { email: string; channels: string[] }
 
@@ -45,6 +46,7 @@ export async function POST(req: Request) {
     })
   } catch (emailError) {
     console.error('Resend email error:', emailError)
+    console.error('Resend error details:', JSON.stringify(emailError))
   }
 
   return NextResponse.json({ success: true })

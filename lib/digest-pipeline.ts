@@ -10,7 +10,7 @@
  */
 
 import { Resend } from 'resend'
-import { EXTRACTION_PROMPT } from './extraction-prompt'
+import { EXTRACTION_PROMPT_DESIGNERS } from './extraction-prompt'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -156,8 +156,9 @@ export async function extractWithClaude(
   transcript: string,
   channelName: string,
   videoTitle: string,
+  prompt: string = EXTRACTION_PROMPT_DESIGNERS,
 ): Promise<string> {
-  const userContent = `${EXTRACTION_PROMPT}\n\n---\n\nChannel: ${channelName}\nVideo: ${videoTitle}\n\nTranscript:\n${transcript}`
+  const userContent = `${prompt}\n\n---\n\nChannel: ${channelName}\nVideo: ${videoTitle}\n\nTranscript:\n${transcript}`
 
   const res = await fetch(ANTHROPIC_API_URL, {
     method: 'POST',

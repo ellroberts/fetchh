@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getVideoMeta, getTranscript, extractWithClaude, cardToHtml } from '@/lib/digest-pipeline'
+import { EXTRACTION_PROMPT_DESIGNERS, EXTRACTION_PROMPT_BUILDERS, EXTRACTION_PROMPT_GENERAL } from '@/lib/extraction-prompt'
+
+type Niche = 'designers' | 'builders' | 'general'
+
+const PROMPT_BY_NICHE: Record<Niche, string> = {
+  designers: EXTRACTION_PROMPT_DESIGNERS,
+  builders: EXTRACTION_PROMPT_BUILDERS,
+  general: EXTRACTION_PROMPT_GENERAL,
+}
 
 function extractVideoId(url: string): string | null {
   const match = url.match(
@@ -10,7 +19,7 @@ function extractVideoId(url: string): string | null {
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const { videoUrl } = body as { videoUrl: string }
+  const { videoUrl, niche = 'designers' } = body as { videoUrl: string; niche?: Niche }
 
   if (!videoUrl?.trim()) {
     return NextResponse.json({ error: 'A YouTube video URL is required.' }, { status: 400 })
@@ -37,10 +46,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: msg }, { status: 422 })
   }
 
+  // Select prompt based on niche
+  const prompt = PROMPT_BY_NICHE[niche] ?? EXTRACTION_PROMPT_DESIGNERS
+
   // Run extraction
   let card: string
   try {
-    card = await extractWithClaude(transcriptResult.text, channelName, videoTitle)
+    card = await extractWithClaude(transcriptResult.text, channelName, videoTitle, prompt)
   } catch (err) {
     console.error('extractWithClaude failed:', err)
     return NextResponse.json({ error: 'Extraction failed. Please try again.' }, { status: 500 })
