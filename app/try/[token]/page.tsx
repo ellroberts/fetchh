@@ -609,10 +609,10 @@ export default function TryTokenPage() {
         <main style={{ ...PAGE, justifyContent: 'center' }}>
           <FormCard>
             <h1 style={{ margin: '0 0 12px', fontSize: 28, fontWeight: 700, color: '#111', lineHeight: 1.2 }}>
-              That&apos;s your 3 free previews
+              Digestt
             </h1>
             <p style={{ margin: '0 0 28px', fontSize: 16, color: '#555', lineHeight: 1.5 }}>
-              Want a weekly digest of your channels? Sign up and get this every Monday.
+              That&apos;s your 3 free previews. Want a weekly digest of the channels you&apos;re interested in?
             </p>
             <Button
               type="button"
@@ -621,7 +621,7 @@ export default function TryTokenPage() {
               onClick={() => window.location.href = signupUrl}
               style={{ width: '100%' }}
             >
-              Sign up free →
+              Join the waitlist
             </Button>
           </FormCard>
         </main>

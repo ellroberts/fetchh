@@ -75,22 +75,22 @@ export default function TryPage() {
             padding: '40px 32px', width: '100%', maxWidth: 480,
             display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
           }}>
+            <img src="/coda_cheeky.svg" alt="" style={{ width: 64, height: 64, marginBottom: 24 }} />
             <h1 style={{ margin: '0 0 12px', fontSize: 28, fontWeight: 700, color: '#111', lineHeight: 1.2 }}>
-              That&apos;s your 3 free previews
+              Digestt
             </h1>
             <p style={{ margin: '0 0 28px', fontSize: 16, color: '#555', lineHeight: 1.5 }}>
-              Want a weekly digest of your channels? Sign up and get this every Monday.
+              That&apos;s your 3 free previews. Want a weekly digest of the channels you&apos;re interested in?
             </p>
-            <a
-              href="/"
-              style={{
-                display: 'block', width: '100%', padding: '14px 0', borderRadius: 8,
-                background: '#6C74FB', color: '#FFF', fontSize: 16, fontWeight: 600,
-                textDecoration: 'none', textAlign: 'center',
-              }}
+            <Button
+              type="button"
+              variant="primary"
+              size="lg"
+              onClick={() => window.location.href = '/'}
+              style={{ width: '100%' }}
             >
-              Sign up free →
-            </a>
+              Join the waitlist
+            </Button>
           </div>
         </main>
       </>
