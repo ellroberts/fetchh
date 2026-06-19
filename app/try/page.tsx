@@ -28,6 +28,7 @@ export default function TryPage() {
   const router = useRouter()
   const [name, setName] = useState('')
   const [niche, setNiche] = useState<Niche>('builders')
+  const [videoUrl, setVideoUrl] = useState('')
   const [status, setStatus] = useState<'idle' | 'submitting' | 'error' | 'limit_reached'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -52,7 +53,7 @@ export default function TryPage() {
         setStatus('error')
         return
       }
-      router.push(`/try/${data.token}?niche=${niche}&name=${encodeURIComponent(name.trim())}`)
+      router.push(`/try/${data.token}?niche=${niche}&name=${encodeURIComponent(name.trim())}&videoUrl=${encodeURIComponent(videoUrl.trim())}`)
     } catch {
       setErrorMsg('Something went wrong. Please try again.')
       setStatus('error')
@@ -140,6 +141,15 @@ export default function TryPage() {
               required
             />
 
+            <Input
+              type="text"
+              label="YouTube video"
+              placeholder="https://www.youtube.com/watch?v=..."
+              value={videoUrl}
+              onChange={(e) => setVideoUrl((e.target as HTMLInputElement).value)}
+              required
+            />
+
             {/* Niche pill toggle */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={{ fontSize: 14, fontWeight: 500, color: '#555' }}>What best describes you?</span>
@@ -182,7 +192,7 @@ export default function TryPage() {
               loading={status === 'submitting'}
               style={{ width: '100%' }}
             >
-              Continue →
+              Let&apos;s go
             </Button>
           </form>
         </div>

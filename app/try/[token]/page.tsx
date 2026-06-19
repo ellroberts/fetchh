@@ -489,6 +489,7 @@ export default function TryTokenPage() {
   const token = params.token as string
   const niche = searchParams.get('niche') ?? 'builders'
   const name = searchParams.get('name') ?? ''
+  const videoUrlParam = searchParams.get('videoUrl') ?? ''
 
   const [videoUrl, setVideoUrl] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error' | 'limit_reached'>('idle')
@@ -505,6 +506,7 @@ export default function TryTokenPage() {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const [carouselSelectedIndex, setCarouselSelectedIndex] = useState(0)
   const promptRef = useRef<HTMLTextAreaElement>(null)
+  const hasAutostartedRef = useRef(false)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -525,6 +527,36 @@ export default function TryTokenPage() {
     }, 500)
     return () => clearInterval(interval)
   }, [status])
+
+  useEffect(() => {
+    if (!videoUrlParam || status !== 'idle' || hasAutostartedRef.current) return
+    hasAutostartedRef.current = true
+    setVideoUrl(videoUrlParam)
+    setStatus('loading')
+    setErrorMsg('')
+    setResult(null)
+    fetch('/api/try', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videoUrl: videoUrlParam, token }),
+    })
+      .then(async (res) => {
+        const data = await res.json()
+        if (!res.ok) {
+          if (data.error === 'limit_reached') { setStatus('limit_reached'); return }
+          setErrorMsg(data.error || 'Something went wrong.')
+          setStatus('error')
+          return
+        }
+        setResult(data)
+        setStatus('done')
+      })
+      .catch(() => {
+        setErrorMsg('Something went wrong. Please try again.')
+        setStatus('error')
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
