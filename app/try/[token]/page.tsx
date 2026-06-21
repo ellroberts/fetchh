@@ -668,25 +668,36 @@ export default function TryTokenPage() {
     const activeStep = currentStep === -1 ? LOADING_STEPS.length : currentStep
     return (
       <>
-        <LogoHeader />
-        <main style={{ ...PAGE, justifyContent: 'center' }}>
-          <FormCard>
-            <h1 style={{ margin: '0 0 28px', fontSize: 28, fontWeight: 700, color: '#111', lineHeight: 1.2 }}>
-              Digestt
-            </h1>
-            <div style={{ width: '100%', marginBottom: 32 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 12, color: '#999', fontWeight: 500 }}>Progress</span>
-                <span style={{ fontSize: 12, color: '#999', fontWeight: 500 }}>{Math.round(loadingProgress)}%</span>
-              </div>
-              <div style={{ width: '100%', height: 6, background: '#EFEFEF', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${loadingProgress}%`, background: '#6C74FB', borderRadius: 3, transition: 'width 0.5s ease' }} />
-              </div>
-            </div>
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#111', textAlign: 'center' }}>
-              {LOADING_STEPS[Math.min(activeStep, LOADING_STEPS.length - 1)]}
-            </p>
-          </FormCard>
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, height: 56,
+          background: '#FFF', boxShadow: '0px 2px 1px rgba(0,0,0,0.05)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
+        }}>
+          <img src="/digestt-logo.svg" alt="Digestt" style={{ height: 24 }} />
+        </div>
+        <main style={{
+          background: '#ffd19d',
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingTop: 56,
+        }}>
+          <img src="/fetchh-loading.svg" alt="" style={{ width: 180, height: 180, marginBottom: 32 }} />
+          <p style={{
+            margin: 0,
+            fontSize: 32,
+            fontWeight: 700,
+            fontStyle: 'italic',
+            fontFamily: 'var(--font-karla), sans-serif',
+            color: '#000',
+            textAlign: 'center',
+            maxWidth: 464,
+            padding: '0 16px',
+          }}>
+            {LOADING_STEPS[Math.min(activeStep, LOADING_STEPS.length - 1)]}
+          </p>
         </main>
       </>
     )
