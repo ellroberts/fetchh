@@ -59,7 +59,7 @@ export default function Home() {
         setStatus('error')
         return
       }
-      router.push(`/try/${data.token}?niche=${niche}&name=${encodeURIComponent(name.trim())}&videoUrl=${encodeURIComponent(videoUrl.trim())}`)
+      router.push(`/try2/${data.token}?niche=${niche}&name=${encodeURIComponent(name.trim())}&videoUrl=${encodeURIComponent(videoUrl.trim())}`)
     } catch {
       setErrorMsg('Something went wrong. Please try again.')
       setStatus('error')
