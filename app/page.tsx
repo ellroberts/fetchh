@@ -71,9 +71,9 @@ export default function Home() {
       <main style={{ background: '#ffd19d', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 16px' }}>
         <div style={{ background: '#FFFFFF', borderRadius: 24, padding: 32, width: 400, maxWidth: '100%', boxShadow: '0px 4px 14px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
           <img src="/coda_cheeky.svg" alt="" style={{ width: 64, height: 64, marginBottom: 24 }} />
-          <h1 style={{ margin: '0 0 12px', fontSize: 28, fontWeight: 800, fontFamily: FONT, color: '#111', lineHeight: 1.2 }}>Digestt</h1>
+          <h1 style={{ margin: '0 0 12px', fontSize: 28, fontWeight: 800, fontFamily: FONT, color: '#111', lineHeight: 1.2 }}>That's your 3 previews</h1>
           <p style={{ margin: '0 0 28px', fontSize: 16, fontFamily: FONT, color: '#555', lineHeight: 1.5 }}>
-            That&apos;s your 3 free previews. Want a weekly digest of the channels you&apos;re interested in?
+            Want a weekly digest of the channels you&apos;re interested in?
           </p>
           <button
             onClick={() => window.location.href = '/'}
@@ -127,7 +127,7 @@ export default function Home() {
           {/* Heading */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <h1 style={{ margin: 0, fontSize: 32, fontWeight: 800, fontFamily: FONT, color: '#000', lineHeight: 'normal' }}>
-              Digestt
+            Catch the highlights
             </h1>
             <p style={{ margin: 0, fontSize: 16, fontWeight: 600, fontFamily: FONT, lineHeight: '28px', color: '#000' }}>
               Get a quick summary on a YouTube video
@@ -170,7 +170,7 @@ export default function Home() {
                     cursor: 'pointer',
                   }}
                 >
-                  <option value="designers">Designers using AI</option>
+                  <option value="designers">Designer using AI</option>
                   <option value="builders">Builders &amp; founders</option>
                   <option value="general">General AI &amp; tech</option>
                 </select>
