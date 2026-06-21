@@ -329,10 +329,12 @@ export default function Try2TokenPage() {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
+    const promptText = promptRef.current?.value ?? defaultPrompt
+    const encodedPrompt = encodeURIComponent(promptText)
     const AI_PROVIDERS = [
-      { label: 'Claude', url: 'https://claude.ai/', favicon: 'https://www.google.com/s2/favicons?domain=claude.ai&sz=64' },
-      { label: 'ChatGPT', url: 'https://chatgpt.com/', favicon: 'https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64' },
-      { label: 'Gemini', url: 'https://gemini.google.com/', favicon: 'https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64' },
+      { label: 'Claude', url: `https://claude.ai/new?q=${encodedPrompt}`, favicon: 'https://www.google.com/s2/favicons?domain=claude.ai&sz=64' },
+      { label: 'ChatGPT', url: `https://chatgpt.com/?q=${encodedPrompt}`, favicon: 'https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64' },
+      { label: 'Gemini', url: `https://gemini.google.com/app`, favicon: 'https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64', copyOnClick: true },
     ]
     const showCopyBtn = hoveringPrompt || hoveringCopyBtn
 
@@ -583,8 +585,8 @@ export default function Try2TokenPage() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 16 }}>
-                        {AI_PROVIDERS.map(({ label, url, favicon }) => (
-                          <a key={label} href={url} target="_blank" rel="noopener noreferrer" onClick={handleCopy} title={`Open ${label}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                        {AI_PROVIDERS.map(({ label, url, favicon, copyOnClick }) => (
+                          <a key={label} href={url} target="_blank" rel="noopener noreferrer" title={copyOnClick ? `Open ${label} (prompt copied to clipboard)` : `Open ${label}`} onClick={copyOnClick ? handleCopy : undefined} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
                             <img src={favicon} alt={label} style={{ width: 32, height: 32 }} />
                           </a>
                         ))}
@@ -593,6 +595,11 @@ export default function Try2TokenPage() {
                   ) : (
                     /* Normal card content */
                     <>
+                      {cards.length > 1 && (
+                        <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 600, fontFamily: FONT, color: 'rgba(0,0,0,0.4)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                          {safeIndexFull + 1} of {cards.length}
+                        </p>
+                      )}
                       {currentCard.title && (
                         <p style={{ margin: 0, fontSize: 32, fontWeight: 800, fontFamily: FONT, color: '#000', lineHeight: '44px' }}>
                           {currentCard.title}
