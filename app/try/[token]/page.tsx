@@ -800,8 +800,8 @@ export default function TryTokenPage() {
     ]
     const feedbackCard = activeCards.length > 1 ? (
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-        <p style={{ margin: '0 0 12px', fontSize: 28, fontWeight: 700, color: '#333', lineHeight: 1.3 }}>Have these cards been helpful?</p>
-        <p style={{ margin: '0 0 32px', fontSize: 15, color: '#333', lineHeight: 1.6, maxWidth: 420 }}>If you&apos;ve any ideas or suggestion to improve the output please let us know. Thanks!</p>
+        <p style={{ margin: '0 0 12px', fontSize: 32, fontWeight: 700, color: '#333', lineHeight: 1.3 }}>Have these cards been helpful?</p>
+        <p style={{ margin: '0 0 32px', fontSize: 16, color: '#333', lineHeight: 1.6, maxWidth: 420 }}>If you&apos;ve any ideas or suggestion to improve the output please let us know. Thanks!</p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 32 }}>
           {feedbackOptions.map(({ value, label, icon: Icon }) => {
             const selected = feedbackRating === value

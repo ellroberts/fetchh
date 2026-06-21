@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, Check, Frown, Meh, Smile, Laugh } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -210,6 +210,13 @@ export default function Try2TokenPage() {
   const [activeTab, setActiveTab] = useState(TABS[0].key)
   const [cardIndex, setCardIndex] = useState(0)
   const [loadingProgress, setLoadingProgress] = useState(0)
+  const [copied, setCopied] = useState(false)
+  const [hoveringPrompt, setHoveringPrompt] = useState(false)
+  const [hoveringCopyBtn, setHoveringCopyBtn] = useState(false)
+  const [feedbackRating, setFeedbackRating] = useState<number | null>(null)
+  const [feedbackComment, setFeedbackComment] = useState('')
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
+  const promptRef = useRef<HTMLTextAreaElement>(null)
   const hasAutostartedRef = useRef(false)
 
   // Mock mode
@@ -305,7 +312,40 @@ export default function Try2TokenPage() {
     const activeField = fieldMap.get(resolvedTab)
     const cards = activeField ? fieldToCards(activeField) : []
     const safeIndex = Math.min(cardIndex, Math.max(0, cards.length - 1))
-    const currentCard = cards[safeIndex]
+    const currentCard = cards[safeIndex] ?? cards[cards.length - 1]
+
+    // AI prompt view for "Next steps" tab
+    const isNextSteps = resolvedTab === 'one-action-this-week'
+    // Feedback appears as an extra slide (index = cards.length) for tabs with >1 card
+    const hasFeedbackSlide = !isNextSteps && cards.length > 1
+    const totalSlides = hasFeedbackSlide ? cards.length + 1 : cards.length
+    const safeIndexFull = Math.min(cardIndex, Math.max(0, totalSlides - 1))
+    const defaultPrompt = cards[0]
+      ? `I just watched "${videoTitle}" and here's the one action I want to take this week:\n\n${cards[0].body}\n\nHelp me get started. What's the first concrete step I can take right now?`
+      : ''
+    const handleCopy = () => {
+      const text = promptRef.current?.value ?? defaultPrompt
+      navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+    const AI_PROVIDERS = [
+      { label: 'Claude', url: 'https://claude.ai/', favicon: 'https://www.google.com/s2/favicons?domain=claude.ai&sz=64' },
+      { label: 'ChatGPT', url: 'https://chatgpt.com/', favicon: 'https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64' },
+      { label: 'Gemini', url: 'https://gemini.google.com/', favicon: 'https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64' },
+    ]
+    const showCopyBtn = hoveringPrompt || hoveringCopyBtn
+
+    // Show feedback card when on the extra slide
+    const showFeedback = hasFeedbackSlide && safeIndexFull === cards.length
+
+    // Feedback options
+    const feedbackOptions = [
+      { value: 1, label: 'Not helpful', Icon: Frown },
+      { value: 2, label: 'A little helpful', Icon: Meh },
+      { value: 3, label: 'Helpful', Icon: Smile },
+      { value: 4, label: 'Very helpful', Icon: Laugh },
+    ]
 
     return (
       <>
@@ -317,8 +357,49 @@ export default function Try2TokenPage() {
           alignItems: 'flex-start',
           justifyContent: 'center',
           padding: '80px 16px',
-          paddingTop: 96,
+          paddingTop: 196,
+          position: 'relative',
         }}>
+          {/* Left chevron — outside card */}
+          {totalSlides > 1 && (
+            <button
+              onClick={() => setCardIndex(i => Math.max(0, i - 1))}
+              disabled={safeIndexFull === 0}
+              style={{
+                position: 'absolute',
+                left: 'calc(50% - 400px)',
+                top: 'calc(96px + 196px)',
+                background: 'none', border: 'none',
+                cursor: safeIndexFull === 0 ? 'default' : 'pointer',
+                opacity: safeIndexFull === 0 ? 0.2 : 1,
+                width: 56, height: 56,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 12, padding: 0,
+              }}
+            >
+              <ChevronLeft size={36} color="#000" />
+            </button>
+          )}
+          {/* Right chevron — outside card */}
+          {totalSlides > 1 && (
+            <button
+              onClick={() => setCardIndex(i => Math.min(totalSlides - 1, i + 1))}
+              disabled={safeIndexFull === totalSlides - 1}
+              style={{
+                position: 'absolute',
+                right: 'calc(50% - 400px)',
+                top: 'calc(96px + 196px)',
+                background: 'none', border: 'none',
+                cursor: safeIndexFull === totalSlides - 1 ? 'default' : 'pointer',
+                opacity: safeIndexFull === totalSlides - 1 ? 0.2 : 1,
+                width: 56, height: 56,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 12, padding: 0,
+              }}
+            >
+              <ChevronRight size={36} color="#000" />
+            </button>
+          )}
           <div style={{
             background: '#FFFFFF',
             borderRadius: 24,
@@ -406,70 +487,152 @@ export default function Try2TokenPage() {
 
                 {/* Content */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 200, overflowY: 'auto' }}>
-                  {currentCard.title && (
-                    <p style={{ margin: 0, fontSize: 24, fontWeight: 800, fontFamily: FONT, color: '#000', lineHeight: '44px' }}>
-                      {currentCard.title}
-                    </p>
-                  )}
-                  {currentCard.body && (
-                    <p style={{ margin: 0, fontSize: 16, fontWeight: 400, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '28px' }}>
-                      {currentCard.body}
-                    </p>
-                  )}
-                  {currentCard.bullets && currentCard.bullets.map((b, i) => (
-                    <p key={i} style={{ margin: '4px 0 0', fontSize: 16, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '28px' }}>
-                      • {b}
-                    </p>
-                  ))}
-                  {currentCard.url && (
-                    <a href={currentCard.url} target="_blank" rel="noopener noreferrer" style={{ marginTop: 8, fontSize: 14, color: '#00a9e5', fontFamily: FONT, textDecoration: 'none' }}>
-                      Open link →
-                    </a>
+                  {showFeedback ? (
+                    /* Feedback card */
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <p style={{ margin: '0 0 8px', fontSize: 32, fontWeight: 800, fontFamily: FONT, color: '#000', lineHeight: '44px' }}>Have these cards been helpful?</p>
+                      <p style={{ margin: '0 0 24px', fontSize: 16, fontWeight: 400, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '28px' }}>Any ideas or suggestions to improve the output? Let us know.</p>
+                      <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
+                        {feedbackOptions.map(({ value, label, Icon }) => {
+                          const selected = feedbackRating === value
+                          return (
+                            <button
+                              key={value}
+                              onClick={() => setFeedbackRating(value)}
+                              title={label}
+                              style={{
+                                background: selected ? '#F0F0FF' : 'transparent',
+                                border: 'none', borderRadius: 999, cursor: 'pointer',
+                                width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: selected ? '#6C74FB' : '#777', padding: 0,
+                              }}
+                            >
+                              <Icon size={24} />
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {feedbackSubmitted ? (
+                        <p style={{ margin: 0, fontSize: 16, fontWeight: 400, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '28px' }}>Thanks for the feedback!</p>
+                      ) : (
+                        <>
+                          <textarea
+                            placeholder="Add a comment"
+                            value={feedbackComment}
+                            onChange={(e) => setFeedbackComment(e.target.value)}
+                            rows={3}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #e6e2db', borderRadius: 8, fontSize: 15, fontFamily: FONT, lineHeight: 1.5, color: '#333', background: '#FAFAFA', resize: 'none', outline: 'none', marginBottom: 12 }}
+                          />
+                          <button
+                            onClick={async () => {
+                              try {
+                                await fetch('/api/try-feedback', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ token, rating: feedbackRating, comment: feedbackComment }),
+                                })
+                                setFeedbackSubmitted(true)
+                              } catch { /* silently fail */ }
+                            }}
+                            style={{
+                              background: '#00a9e5', borderRadius: 6, height: 44, padding: '0 24px',
+                              border: 'none', cursor: 'pointer', fontSize: 16, fontWeight: 700,
+                              fontFamily: FONT, color: '#FFF',
+                            }}
+                          >
+                            Send
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ) : isNextSteps && defaultPrompt ? (
+                    /* AI prompt view for Next steps */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                      {currentCard.title && (
+                        <p style={{ margin: '0 0 4px', fontSize: 32, fontWeight: 800, fontFamily: FONT, color: '#000', lineHeight: '44px' }}>
+                          {currentCard.title}
+                        </p>
+                      )}
+                      {currentCard.body && (
+                        <p style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 400, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '28px' }}>
+                          {currentCard.body}
+                        </p>
+                      )}
+                      <p style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700, fontFamily: FONT, color: '#111' }}>
+                        Use this as an AI prompt to get started
+                      </p>
+                      <div style={{ position: 'relative' }} onMouseEnter={() => setHoveringPrompt(true)} onMouseLeave={() => setHoveringPrompt(false)}>
+                        <textarea
+                          key={`prompt-${videoTitle}`}
+                          ref={promptRef}
+                          defaultValue={defaultPrompt}
+                          rows={6}
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '14px 44px 14px 14px', border: '1px solid #e6e2db', borderRadius: 8, fontSize: 14, lineHeight: 1.6, color: '#333', background: '#FAFAFA', resize: 'none', fontFamily: FONT, outline: 'none' }}
+                        />
+                        <div
+                          style={{ position: 'absolute', top: 10, right: 10, opacity: showCopyBtn ? 1 : 0, transition: 'opacity 0.15s ease' }}
+                          onMouseEnter={() => setHoveringCopyBtn(true)}
+                          onMouseLeave={() => setHoveringCopyBtn(false)}
+                        >
+                          <button
+                            onClick={handleCopy}
+                            style={{ background: '#F0F0F0', border: 'none', borderRadius: 7, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, color: copied ? '#22C55E' : '#666', transition: 'color 0.15s ease' }}
+                          >
+                            {copied ? <Check size={14} /> : <Copy size={14} />}
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 16 }}>
+                        {AI_PROVIDERS.map(({ label, url, favicon }) => (
+                          <a key={label} href={url} target="_blank" rel="noopener noreferrer" onClick={handleCopy} title={`Open ${label}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                            <img src={favicon} alt={label} style={{ width: 32, height: 32 }} />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    /* Normal card content */
+                    <>
+                      {currentCard.title && (
+                        <p style={{ margin: 0, fontSize: 32, fontWeight: 800, fontFamily: FONT, color: '#000', lineHeight: '44px' }}>
+                          {currentCard.title}
+                        </p>
+                      )}
+                      {currentCard.body && (
+                        <p style={{ margin: 0, fontSize: 16, fontWeight: 400, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '28px' }}>
+                          {currentCard.body}
+                        </p>
+                      )}
+                      {currentCard.bullets && currentCard.bullets.map((b, i) => (
+                        <p key={i} style={{ margin: '4px 0 0', fontSize: 16, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '28px' }}>
+                          • {b}
+                        </p>
+                      ))}
+                      {currentCard.url && (
+                        <a href={currentCard.url} target="_blank" rel="noopener noreferrer" style={{ marginTop: 8, fontSize: 14, color: '#00a9e5', fontFamily: FONT, textDecoration: 'none' }}>
+                          Open link →
+                        </a>
+                      )}
+                    </>
                   )}
                 </div>
 
-                {/* Navigation — always rendered to keep card height stable */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', visibility: cards.length > 1 ? 'visible' : 'hidden' }}>
-                    <button
-                      onClick={() => setCardIndex(i => Math.max(0, i - 1))}
-                      disabled={safeIndex === 0}
-                      style={{
-                        background: 'none', border: 'none', cursor: safeIndex === 0 ? 'default' : 'pointer',
-                        opacity: safeIndex === 0 ? 0.25 : 1, width: 40, height: 40,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8,
-                        padding: 0,
-                      }}
-                    >
-                      <ChevronLeft size={20} color="#000" />
-                    </button>
-
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      {cards.map((_, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setCardIndex(i)}
-                          style={{
-                            width: 10, height: 10, borderRadius: '50%', border: 'none', padding: 0,
-                            background: i === safeIndex ? '#000' : '#D4D0C8',
-                            cursor: 'pointer',
-                          }}
-                        />
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={() => setCardIndex(i => Math.min(cards.length - 1, i + 1))}
-                      disabled={safeIndex === cards.length - 1}
-                      style={{
-                        background: 'none', border: 'none', cursor: safeIndex === cards.length - 1 ? 'default' : 'pointer',
-                        opacity: safeIndex === cards.length - 1 ? 0.25 : 1, width: 40, height: 40,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8,
-                        padding: 0,
-                      }}
-                    >
-                      <ChevronRight size={20} color="#000" />
-                    </button>
+                {/* Dots only — chevrons are outside the card */}
+                <div style={{ display: 'flex', justifyContent: 'center', visibility: totalSlides > 1 ? 'visible' : 'hidden' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {Array.from({ length: totalSlides }).map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setCardIndex(i)}
+                        style={{
+                          width: 10, height: 10, borderRadius: '50%', border: 'none', padding: 0,
+                          background: i === safeIndexFull ? '#000' : '#D4D0C8',
+                          cursor: 'pointer',
+                        }}
+                      />
+                    ))}
                   </div>
+                </div>
               </div>
             )}
           </div>
