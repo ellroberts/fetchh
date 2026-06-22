@@ -215,7 +215,7 @@ export default function Try2TokenPage() {
   const [hoveringCopyBtn, setHoveringCopyBtn] = useState(false)
   const [feedbackRating, setFeedbackRating] = useState<number | null>(null)
   const [feedbackComment, setFeedbackComment] = useState('')
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState<Record<string, boolean>>({})
   const promptRef = useRef<HTMLTextAreaElement>(null)
   const hasAutostartedRef = useRef(false)
 
@@ -256,8 +256,12 @@ export default function Try2TokenPage() {
     return () => clearInterval(interval)
   }, [status])
 
-  // Reset card index on tab change
-  useEffect(() => { setCardIndex(0) }, [activeTab])
+  // Reset card index, rating and comment on tab change
+  useEffect(() => {
+    setCardIndex(0)
+    setFeedbackRating(null)
+    setFeedbackComment('')
+  }, [activeTab])
 
   const LogoHeader = () => (
     <div style={{
@@ -514,7 +518,7 @@ export default function Try2TokenPage() {
                           )
                         })}
                       </div>
-                      {feedbackSubmitted ? (
+                      {feedbackSubmitted[resolvedTab] ? (
                         <p style={{ margin: 0, fontSize: 16, fontWeight: 400, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '28px' }}>Thanks for the feedback!</p>
                       ) : (
                         <>
@@ -531,9 +535,9 @@ export default function Try2TokenPage() {
                                 await fetch('/api/try-feedback', {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ token, rating: feedbackRating, comment: feedbackComment }),
+                                  body: JSON.stringify({ token, rating: feedbackRating, comment: feedbackComment, tab: resolvedTab }),
                                 })
-                                setFeedbackSubmitted(true)
+                                setFeedbackSubmitted(prev => ({ ...prev, [resolvedTab]: true }))
                               } catch { /* silently fail */ }
                             }}
                             style={{
