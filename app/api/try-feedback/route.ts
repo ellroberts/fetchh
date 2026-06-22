@@ -24,7 +24,7 @@ const TAB_LABELS: Record<string, string> = {
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const { token, rating, comment, tab } = body as { token: string; rating: number | null; comment: string; tab?: string }
+  const { token, rating, comment, tab, videoTitle } = body as { token: string; rating: number | null; comment: string; tab?: string; videoTitle?: string }
 
   // Look up the tester name from try_sessions
   const { data: session } = await supabase
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
       from: process.env.RESEND_FROM_EMAIL!,
       to: 'elliot.roberts@gmail.com',
       subject: `Digestt feedback from ${name} — ${tabLabel} — ${ratingLabel}`,
-      text: `From: ${name}\nNiche: ${niche}\nTab: ${tabLabel}\nRating: ${ratingLabel}\n\nComment:\n${comment || '(none)'}`,
+      text: `From: ${name}\nNiche: ${niche}\nVideo: ${videoTitle || 'Unknown'}\nTab: ${tabLabel}\nRating: ${ratingLabel}\n\nComment:\n${comment || '(none)'}`,
     })
   } catch (err) {
     console.error('try-feedback email error:', err)

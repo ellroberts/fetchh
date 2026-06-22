@@ -10,8 +10,8 @@ const karla = Karla({ subsets: ['latin'], weight: ['400', '600', '700', '800'], 
 const figtree = Figtree({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700', '800'], variable: '--font-figtree' });
 
 export const metadata: Metadata = {
-  title: 'ThreadCub',
-  description: 'Manage and review AI conversations across platforms.',
+  title: 'Fetchh',
+  description: 'Get a quick summary on any YouTube video.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

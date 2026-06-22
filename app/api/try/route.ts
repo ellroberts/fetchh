@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { Resend } from 'resend'
 import { getVideoMeta, getTranscript, extractWithClaude, cardToHtml } from '@/lib/digest-pipeline'
 import { EXTRACTION_PROMPT_DESIGNERS, EXTRACTION_PROMPT_BUILDERS, EXTRACTION_PROMPT_GENERAL } from '@/lib/extraction-prompt'
 
@@ -51,10 +52,28 @@ export async function POST(req: Request) {
   }
 
   // Increment try_count
+  const newCount = session.try_count + 1
   await supabase
     .from('try_sessions')
-    .update({ try_count: session.try_count + 1 })
+    .update({ try_count: newCount })
     .eq('token', token)
+
+  // Notify when tester hits their last try
+  if (newCount >= 3) {
+    try {
+      const resend = new Resend(process.env.RESEND_API_KEY)
+      const name = (session as { email?: string }).email ?? 'Unknown'
+      const niche = session.niche ?? 'unknown'
+      await resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL!,
+        to: 'elliot.roberts@gmail.com',
+        subject: `Digestt — tester limit reached`,
+        text: `${name} (${niche}) has used all 3 tries.`,
+      })
+    } catch (err) {
+      console.error('limit-reached email error:', err)
+    }
+  }
 
   const videoId = extractVideoId(videoUrl.trim())
   if (!videoId) {
