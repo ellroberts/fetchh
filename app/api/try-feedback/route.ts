@@ -14,9 +14,17 @@ const RATING_LABELS: Record<number, string> = {
   4: 'Very helpful',
 }
 
+const TAB_LABELS: Record<string, string> = {
+  'techniques-worth-trying': 'Try this',
+  'decision-relevant-facts': 'Worth knowing',
+  'mental-models': 'New angle',
+  'things-to-skip': "Don't bother",
+  'one-action-this-week': 'Next steps',
+}
+
 export async function POST(req: Request) {
   const body = await req.json()
-  const { token, rating, comment } = body as { token: string; rating: number | null; comment: string }
+  const { token, rating, comment, tab } = body as { token: string; rating: number | null; comment: string; tab?: string }
 
   // Look up the tester name from try_sessions
   const { data: session } = await supabase
@@ -31,11 +39,12 @@ export async function POST(req: Request) {
   try {
     const resend = new Resend(process.env.RESEND_API_KEY)
     const ratingLabel = rating ? RATING_LABELS[rating] ?? String(rating) : 'No rating given'
+    const tabLabel = tab ? (TAB_LABELS[tab] ?? tab) : 'Unknown tab'
     await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL!,
       to: 'elliot.roberts@gmail.com',
-      subject: `Digestt feedback from ${name} — ${ratingLabel}`,
-      text: `From: ${name}\nNiche: ${niche}\nRating: ${ratingLabel}\n\nComment:\n${comment || '(none)'}`,
+      subject: `Digestt feedback from ${name} — ${tabLabel} — ${ratingLabel}`,
+      text: `From: ${name}\nNiche: ${niche}\nTab: ${tabLabel}\nRating: ${ratingLabel}\n\nComment:\n${comment || '(none)'}`,
     })
   } catch (err) {
     console.error('try-feedback email error:', err)

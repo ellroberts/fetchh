@@ -283,9 +283,13 @@ export default function Try2TokenPage() {
         <LogoHeader />
         <main style={{ background: '#ffd19d', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 56 }}>
           <img src="/fetchh-loading.svg" alt="" style={{ width: 180, height: 180, marginBottom: 32 }} />
-          <p style={{ margin: 0, fontSize: 32, fontWeight: 700, fontStyle: 'italic', fontFamily: FONT, color: '#000', textAlign: 'center', maxWidth: 464, padding: '0 16px' }}>
+          <p style={{ margin: '0 0 40px', fontSize: 32, fontWeight: 700, fontStyle: 'italic', fontFamily: FONT, color: '#000', textAlign: 'center', maxWidth: 464, padding: '0 16px' }}>
             {LOADING_STEPS[Math.min(activeStep, LOADING_STEPS.length - 1)]}
           </p>
+          {/* Progress bar */}
+          <div style={{ width: 280, height: 6, background: 'rgba(0,0,0,0.12)', borderRadius: 999 }}>
+            <div style={{ height: '100%', borderRadius: 999, background: '#000', width: `${loadingProgress}%`, transition: 'width 0.4s ease' }} />
+          </div>
         </main>
       </>
     )
