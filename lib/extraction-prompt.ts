@@ -115,3 +115,15 @@ Finally, after all fields, output a single line in this exact format:
 RELEVANT_RESOURCES: [{"name":"ResourceName","url":"https://example.com"}]
 
 List any specific tools, products, services, platforms, or companies mentioned. Use the most likely homepage URL. If nothing specific is mentioned, output: RELEVANT_RESOURCES: []`
+
+export function getExtractionPromptForGoal(goal: string): string {
+  const trimmed = (goal ?? '').trim()
+  if (!trimmed || trimmed.length < 5) return EXTRACTION_PROMPT_BUILDERS
+
+  return EXTRACTION_PROMPT_BUILDERS.replace(
+    'You are extracting structured takeaways from YouTube video transcripts for a builder, indie founder, or vibe coder',
+    `You are extracting structured takeaways from YouTube video transcripts for someone who has told you exactly what they want to get out of this video: "${trimmed}". Keep this goal front of mind throughout your extraction — highlight what's most relevant to it and frame the output around what actually helps them achieve it. If the video has little to do with their stated goal, say so plainly in the AI relevance label.
+
+You are otherwise operating as an extraction assistant for a builder, indie founder, or vibe coder`
+  )
+}

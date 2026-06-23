@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import { getVideoMeta, getTranscript, extractWithClaude, cardToHtml } from '@/lib/digest-pipeline'
-import { EXTRACTION_PROMPT_DESIGNERS, EXTRACTION_PROMPT_BUILDERS, EXTRACTION_PROMPT_GENERAL } from '@/lib/extraction-prompt'
+import { EXTRACTION_PROMPT_DESIGNERS, EXTRACTION_PROMPT_BUILDERS, EXTRACTION_PROMPT_GENERAL, getExtractionPromptForGoal } from '@/lib/extraction-prompt'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   // Look up session
   const { data: session, error: sessionError } = await supabase
     .from('try_sessions')
-    .select('token, niche, try_count')
+    .select('token, niche, goal, try_count')
     .eq('token', token)
     .single()
 
@@ -63,12 +63,14 @@ export async function POST(req: Request) {
     try {
       const resend = new Resend(process.env.RESEND_API_KEY)
       const name = (session as { email?: string }).email ?? 'Unknown'
-      const niche = session.niche ?? 'unknown'
+      const identifier = (session as { goal?: string }).goal
+        ? `goal: "${(session as { goal: string }).goal}"`
+        : `niche: ${session.niche ?? 'unknown'}`
       await resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL!,
         to: 'elliot.roberts@gmail.com',
         subject: `Digestt — tester limit reached`,
-        text: `${name} (${niche}) has used all 3 tries.`,
+        text: `${name} (${identifier}) has used all 3 tries.`,
       })
     } catch (err) {
       console.error('limit-reached email error:', err)
@@ -96,9 +98,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: msg }, { status: 422 })
   }
 
-  // Select prompt based on niche from session
+  // Select prompt based on goal (new) or niche (existing)
   const niche = session.niche as Niche
-  const prompt = PROMPT_BY_NICHE[niche] ?? EXTRACTION_PROMPT_DESIGNERS
+  const prompt = (session as { goal?: string }).goal
+    ? getExtractionPromptForGoal((session as { goal: string }).goal)
+    : (PROMPT_BY_NICHE[niche] ?? EXTRACTION_PROMPT_BUILDERS)
 
   // Run extraction
   let card: string

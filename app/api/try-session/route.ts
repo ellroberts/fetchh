@@ -9,10 +9,40 @@ const supabase = createClient(
 type Niche = 'designers' | 'builders' | 'general'
 const VALID_NICHES: Niche[] = ['designers', 'builders', 'general']
 
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url)
+  const token = searchParams.get('token')
+  if (!token) return NextResponse.json({ error: 'Token required' }, { status: 400 })
+  const { data, error } = await supabase
+    .from('try_sessions')
+    .select('try_count')
+    .eq('token', token)
+    .single()
+  if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return NextResponse.json({ try_count: data.try_count })
+}
+
 export async function POST(req: Request) {
   const body = await req.json()
-  const { name, niche } = body as { name: string; niche: string }
+  const { name, niche, goal } = body as { name?: string; niche?: string; goal?: string | null }
 
+  // Goal-only flow (new /try-v2 caller)
+  if (!niche) {
+    const { data, error } = await supabase
+      .from('try_sessions')
+      .insert({ goal: goal ?? null })
+      .select('token')
+      .single()
+
+    if (error || !data) {
+      console.error('try_sessions insert error:', error)
+      return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 })
+    }
+
+    return NextResponse.json({ token: data.token })
+  }
+
+  // Full existing flow (name + niche)
   if (!name || !name.trim()) {
     return NextResponse.json({ error: 'Please enter your name.' }, { status: 400 })
   }
