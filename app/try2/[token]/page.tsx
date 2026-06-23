@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Copy, Check, Frown, Meh, Smile, Laugh } from 'lucide-react'
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+// ── Typess ──────────────────────────────────────────────────────────────────────
 
 interface ParsedField {
   key: string
