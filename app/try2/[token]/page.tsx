@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Copy, Check, Frown, Meh, Smile, Laugh } from 'lucide-react'
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+// ── Typess ──────────────────────────────────────────────────────────────────────
 
 interface ParsedField {
   key: string
@@ -269,7 +269,7 @@ export default function Try2TokenPage() {
       background: '#FFF', boxShadow: '0px 2px 1px rgba(0,0,0,0.05)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
     }}>
-      <img src="/digestt-logo.svg" alt="Digestt" style={{ height: 24 }} />
+      <img src="/fetchh-logo.svg" alt="Fetchh" style={{ height: 24 }} />
     </div>
   )
 

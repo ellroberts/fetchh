@@ -69,7 +69,7 @@ export async function POST(req: Request) {
       await resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL!,
         to: 'elliot.roberts@gmail.com',
-        subject: `Digestt — tester limit reached`,
+        subject: `Fetchh — tester limit reached`,
         text: `${name} (${identifier}) has used all 3 tries.`,
       })
     } catch (err) {
