@@ -6,12 +6,12 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ExtensionTokenSync } from '@/components/ExtensionTokenSync';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-const karla = Karla({ subsets: ['latin'], weight: ['400', '600'], variable: '--font-karla' });
+const karla = Karla({ subsets: ['latin'], weight: ['400', '600', '700', '800'], variable: '--font-karla' });
 const figtree = Figtree({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700', '800'], variable: '--font-figtree' });
 
 export const metadata: Metadata = {
-  title: 'ThreadCub',
-  description: 'Manage and review AI conversations across platforms.',
+  title: 'Fetchh',
+  description: 'Get a quick summary on any YouTube video.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

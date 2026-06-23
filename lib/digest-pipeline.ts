@@ -10,13 +10,13 @@
  */
 
 import { Resend } from 'resend'
-import { EXTRACTION_PROMPT } from './extraction-prompt'
+import { EXTRACTION_PROMPT_DESIGNERS } from './extraction-prompt'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
 const SUPADATA_BASE = 'https://api.supadata.ai/v1'
-const MODEL = 'claude-sonnet-4-20250514'
+const MODEL = 'claude-sonnet-4-6'
 const CHANNEL_VIDEO_FETCH_LIMIT = 30
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
 const RETRY_DELAYS_MS = [1000, 3000]
@@ -26,6 +26,7 @@ const RETRY_DELAYS_MS = [1000, 3000]
 export interface DigestCard {
   channelUrl: string
   channelName: string
+  videoId: string
   videoTitle: string
   card: string
 }
@@ -34,22 +35,22 @@ export interface DigestResult {
   email: string
   dateStr: string
   cards: DigestCard[]
-  byChannel: Map<string, Array<{ videoTitle: string; card: string }>>
+  byChannel: Map<string, Array<{ videoTitle: string; videoId?: string; card: string }>>
 }
 
-interface VideoMeta {
+export interface VideoMeta {
   id: string
   title: string
   uploadDate: string | null
   channelName: string
 }
 
-type MetaResult =
+export type MetaResult =
   | { ok: true; meta: VideoMeta }
   | { ok: false; reason: 'not-found' }
   | { ok: false; reason: 'fetch-failed'; videoId: string; status: number }
 
-type TranscriptResult =
+export type TranscriptResult =
   | { ok: true; text: string }
   | { ok: false; reason: 'no-transcript' }
   | { ok: false; reason: 'fetch-failed'; status: number }
@@ -93,7 +94,7 @@ async function getChannelVideoIds(channelUrl: string): Promise<string[]> {
   return data.videoIds ?? []
 }
 
-async function getVideoMeta(videoId: string): Promise<MetaResult> {
+export async function getVideoMeta(videoId: string): Promise<MetaResult> {
   const res = await fetchWithRetry(`/youtube/video?id=${encodeURIComponent(videoId)}`)
   if (res.status === 404) return { ok: false, reason: 'not-found' }
   if (!res.ok) return { ok: false, reason: 'fetch-failed', videoId, status: res.status }
@@ -139,7 +140,7 @@ async function getRecentVideoMetas(
   return { recent, failed }
 }
 
-async function getTranscript(videoId: string): Promise<TranscriptResult> {
+export async function getTranscript(videoId: string): Promise<TranscriptResult> {
   const params = new URLSearchParams({ videoId, text: 'true' })
   const res = await fetchWithRetry(`/youtube/transcript?${params}`)
   if (res.status === 404) return { ok: false, reason: 'no-transcript' }
@@ -151,12 +152,13 @@ async function getTranscript(videoId: string): Promise<TranscriptResult> {
   return { ok: false, reason: 'no-transcript' }
 }
 
-async function extractWithClaude(
+export async function extractWithClaude(
   transcript: string,
   channelName: string,
   videoTitle: string,
+  prompt: string = EXTRACTION_PROMPT_DESIGNERS,
 ): Promise<string> {
-  const userContent = `${EXTRACTION_PROMPT}\n\n---\n\nChannel: ${channelName}\nVideo: ${videoTitle}\n\nTranscript:\n${transcript}`
+  const userContent = `${prompt}\n\n---\n\nChannel: ${channelName}\nVideo: ${videoTitle}\n\nTranscript:\n${transcript}`
 
   const res = await fetch(ANTHROPIC_API_URL, {
     method: 'POST',
@@ -167,7 +169,7 @@ async function extractWithClaude(
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 2048,
+      max_tokens: 4096,
       messages: [{ role: 'user', content: userContent }],
     }),
   })
@@ -192,39 +194,37 @@ function inlineMarkdown(text: string): string {
 }
 
 export function cardToHtml(cardText: string): string {
-  const stripped = cardText.replace(/^#\s+[^\n]+\n?/, '')
+  // Strip the leading "# Channel: ..." and "## Video: ..." header lines the extraction prompt prepends
+  const stripped = cardText
+    .replace(/^#\s+[^\n]+\n?/, '')
+    .replace(/^##\s+Video:[^\n]+\n?/m, '')
   const lines = stripped.split('\n')
   const out: string[] = []
+
+  const LABEL_STYLE = 'margin:20px 0 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#666;'
+  const BODY_STYLE = 'margin:4px 0;font-size:15px;color:#374151;line-height:1.6;'
 
   for (const raw of lines) {
     const line = raw.trimEnd()
 
     if (!line) { out.push('<br>'); continue }
 
-    if (line.startsWith('### ')) {
-      out.push(`<h4 style="margin:18px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;">${inlineMarkdown(line.slice(4))}</h4>`)
+    if (line.startsWith('### ') || line.startsWith('## ') || line.startsWith('# ')) {
+      const text = line.replace(/^#{1,3}\s+/, '')
+      out.push(`<p style="${LABEL_STYLE}">${inlineMarkdown(text)}</p>`)
       continue
     }
-    if (line.startsWith('## ')) {
-      out.push(`<h3 style="margin:16px 0 4px;font-size:15px;font-weight:600;color:#111;">${inlineMarkdown(line.slice(3))}</h3>`)
-      continue
-    }
-    if (line.startsWith('# ')) {
-      out.push(`<h3 style="margin:16px 0 4px;font-size:15px;font-weight:600;color:#111;">${inlineMarkdown(line.slice(2))}</h3>`)
+    const boldLineMatch = line.trim().match(/^\*\*(.+)\*\*$/)
+    if (boldLineMatch) {
+      const inner = boldLineMatch[1].replace(/^\d+\.\s*/, '')
+      out.push(`<p style="${LABEL_STYLE}">${inlineMarkdown(inner)}</p>`)
       continue
     }
     if (/^[-*•]\s/.test(line)) {
-      out.push(`<li style="margin:3px 0;color:#374151;line-height:1.6;">${inlineMarkdown(line.slice(2).trim())}</li>`)
+      out.push(`<li style="margin:3px 0;font-size:15px;color:#374151;line-height:1.6;">${inlineMarkdown(line.slice(2).trim())}</li>`)
       continue
     }
-    if (/^\d+\.\s/.test(line)) {
-      const match = line.match(/^\d+\.\s(.*)/)
-      if (match) {
-        out.push(`<p style="margin:14px 0 2px;font-weight:600;color:#111;">${inlineMarkdown(match[1])}</p>`)
-        continue
-      }
-    }
-    out.push(`<p style="margin:4px 0;color:#374151;line-height:1.6;">${inlineMarkdown(line)}</p>`)
+    out.push(`<p style="${BODY_STYLE}">${inlineMarkdown(line)}</p>`)
   }
 
   return out.join('\n')
@@ -233,37 +233,57 @@ export function cardToHtml(cardText: string): string {
 export function buildEmailHtml(
   dateStr: string,
   recipientEmail: string,
-  byChannel: Map<string, Array<{ videoTitle: string; card: string }>>,
+  byChannel: Map<string, Array<{ videoTitle: string; videoId?: string; card: string }>>,
 ): string {
+  const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+
   const channelSections = Array.from(byChannel.entries()).map(([channelName, channelCards]) => {
-    const videoCards = channelCards.map(({ videoTitle, card }) => `
-      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px 24px;margin-bottom:16px;">
-        <h3 style="margin:0 0 12px;font-size:16px;font-weight:700;color:#111;line-height:1.3;">${escapeHtml(videoTitle)}</h3>
+    const videoCards = channelCards.map(({ videoTitle, videoId, card }, i) => {
+      const isLast = i === channelCards.length - 1
+      const youtubeUrl = videoId ? `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}` : null
+      const thumbnailUrl = videoId ? `https://img.youtube.com/vi/${encodeURIComponent(videoId)}/maxresdefault.jpg` : null
+
+      const titleHtml = youtubeUrl
+        ? `<a href="${youtubeUrl}" style="font-size:17px;font-weight:700;color:#111;text-decoration:none;line-height:1.3;display:block;">${escapeHtml(videoTitle)}</a>`
+        : `<span style="font-size:17px;font-weight:700;color:#111;line-height:1.3;display:block;">${escapeHtml(videoTitle)}</span>`
+
+      const thumbnailHtml = thumbnailUrl
+        ? `<a href="${youtubeUrl}" style="display:block;margin-bottom:14px;"><img src="${thumbnailUrl}" alt="" width="560" style="display:block;width:100%;border-radius:4px;"></a>`
+        : ''
+
+      const divider = !isLast ? '<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 0;">' : ''
+
+      return `
+      <div style="padding:20px;${isLast ? '' : 'padding-bottom:0;'}">
+        ${thumbnailHtml}
+        <div style="margin-bottom:14px;">${titleHtml}</div>
         ${cardToHtml(card)}
-      </div>
-    `).join('\n')
+        ${divider}
+      </div>`
+    }).join('\n')
 
     return `
-      <div style="margin-bottom:32px;">
-        <h2 style="margin:0 0 12px;font-size:18px;font-weight:700;color:#111;padding-bottom:8px;border-bottom:2px solid #e5e7eb;">${escapeHtml(channelName)}</h2>
+      <div style="background:#f9f9f9;border-radius:8px;margin-bottom:24px;overflow:hidden;">
+        <div style="padding:12px 20px 10px;border-bottom:1px solid #e5e7eb;">
+          <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#888;">${escapeHtml(channelName)}</p>
+        </div>
         ${videoCards}
-      </div>
-    `
+      </div>`
   }).join('\n')
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <div style="max-width:640px;margin:32px auto;padding:0 16px;">
-    <div style="background:#111;border-radius:8px 8px 0 0;padding:24px 28px;">
-      <p style="margin:0;font-size:12px;font-weight:600;letter-spacing:0.1em;color:#9ca3af;text-transform:uppercase;">Niche Digest</p>
-      <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#fff;">${dateStr}</h1>
+<body style="margin:0;padding:0;background:#ffffff;font-family:${FONT};font-size:15px;line-height:1.6;">
+  <div style="max-width:600px;margin:0 auto;padding:32px 16px;">
+    <div style="background:#111;border-radius:8px 8px 0 0;padding:24px 28px;margin-bottom:0;">
+      <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.1em;color:#9ca3af;text-transform:uppercase;">Digestt</p>
+      <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#fff;">${escapeHtml(dateStr)}</h1>
     </div>
-    <div style="background:#f9fafb;padding:24px 28px;">
+    <div style="background:#ffffff;padding:24px 0;">
       ${channelSections}
     </div>
-    <div style="padding:16px 28px;text-align:center;">
+    <div style="padding:16px 0;text-align:center;border-top:1px solid #e5e7eb;">
       <p style="margin:0;font-size:12px;color:#9ca3af;">Sent to ${escapeHtml(recipientEmail)} · Last 7 days of videos</p>
     </div>
   </div>
@@ -274,7 +294,7 @@ export function buildEmailHtml(
 async function sendDigestEmail(
   recipientEmail: string,
   dateStr: string,
-  byChannel: Map<string, Array<{ videoTitle: string; card: string }>>,
+  byChannel: Map<string, Array<{ videoTitle: string; videoId?: string; card: string }>>,
   log: (msg: string) => void,
 ): Promise<void> {
   const resendKey = process.env.RESEND_API_KEY
@@ -361,17 +381,17 @@ export async function runDigestForUser(
         continue
       }
 
-      cards.push({ channelUrl, channelName: video.channelName, videoTitle: video.title, card })
+      cards.push({ channelUrl, channelName: video.channelName, videoId: video.id, videoTitle: video.title, card })
       log(`    ✓ Card extracted`)
     }
   }
 
   if (cards.length === 0) return null
 
-  const byChannel = new Map<string, Array<{ videoTitle: string; card: string }>>()
+  const byChannel = new Map<string, Array<{ videoTitle: string; videoId?: string; card: string }>>()
   for (const c of cards) {
     if (!byChannel.has(c.channelName)) byChannel.set(c.channelName, [])
-    byChannel.get(c.channelName)!.push({ videoTitle: c.videoTitle, card: c.card })
+    byChannel.get(c.channelName)!.push({ videoTitle: c.videoTitle, videoId: c.videoId, card: c.card })
   }
 
   await sendDigestEmail(email, dateStr, byChannel, log)

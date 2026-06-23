@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
 
-type Niche = 'designers' | 'builders' | 'general'
-
 const FONT = 'var(--font-karla), sans-serif'
 
 const INPUT_STYLE: React.CSSProperties = {
@@ -30,13 +28,25 @@ const LABEL_STYLE: React.CSSProperties = {
   color: '#3d3830',
 }
 
-export default function Home() {
+const LS_KEY = 'digestt_try_token_v2'
+
+export default function TryV2() {
   const router = useRouter()
-  const [name, setName] = useState('')
-  const [niche, setNiche] = useState<Niche>('builders')
+  const [goal, setGoal] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
   const [status, setStatus] = useState<'idle' | 'submitting' | 'error' | 'limit_reached'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
+
+  useEffect(() => {
+    const token = localStorage.getItem(LS_KEY)
+    if (!token) return
+    fetch(`/api/try-session?token=${encodeURIComponent(token)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.try_count >= 3) setStatus('limit_reached')
+      })
+      .catch(() => { /* silently ignore */ })
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,7 +57,7 @@ export default function Home() {
       const res = await fetch('/api/try-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), niche }),
+        body: JSON.stringify({ goal: goal.trim() || null }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -59,7 +69,8 @@ export default function Home() {
         setStatus('error')
         return
       }
-      router.push(`/try2/${data.token}?niche=${niche}&name=${encodeURIComponent(name.trim())}&videoUrl=${encodeURIComponent(videoUrl.trim())}`)
+      localStorage.setItem(LS_KEY, data.token)
+      router.push(`/try2/${data.token}?videoUrl=${encodeURIComponent(videoUrl.trim())}`)
     } catch {
       setErrorMsg('Something went wrong. Please try again.')
       setStatus('error')
@@ -71,7 +82,7 @@ export default function Home() {
       <main style={{ background: '#ffd19d', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 16px' }}>
         <div style={{ background: '#FFFFFF', borderRadius: 24, padding: 32, width: 400, maxWidth: '100%', boxShadow: '0px 4px 14px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
           <img src="/coda_cheeky.svg" alt="" style={{ width: 64, height: 64, marginBottom: 24 }} />
-          <h1 style={{ margin: '0 0 12px', fontSize: 28, fontWeight: 800, fontFamily: FONT, color: '#111', lineHeight: 1.2 }}>That's your 3 previews</h1>
+          <h1 style={{ margin: '0 0 12px', fontSize: 28, fontWeight: 800, fontFamily: FONT, color: '#111', lineHeight: 1.2 }}>That&apos;s your 3 previews</h1>
           <p style={{ margin: '0 0 28px', fontSize: 16, fontFamily: FONT, color: '#555', lineHeight: 1.5 }}>
             Want a weekly digest of the channels you&apos;re interested in?
           </p>
@@ -105,9 +116,9 @@ export default function Home() {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingTop: 56,
+        justifyContent: 'flex-start',
         padding: '80px 16px',
+        paddingTop: 104,
       }}>
         {/* Dog above card */}
         <img src="/coda_cheeky.svg" alt="" style={{ width: 124, height: 124, position: 'relative', zIndex: 1, marginBottom: 32 }} />
@@ -127,7 +138,7 @@ export default function Home() {
           {/* Heading */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <h1 style={{ margin: 0, fontSize: 36, fontWeight: 800, fontFamily: FONT, color: '#000', lineHeight: 'normal' }}>
-            Catch the highlights
+              Catch the highlights
             </h1>
             <p style={{ margin: 0, fontSize: 18, fontWeight: 600, fontFamily: FONT, lineHeight: '28px', color: '#000' }}>
               Get a quick summary on a YouTube video
@@ -139,46 +150,9 @@ export default function Home() {
             {/* Fields */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-              {/* Name */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={LABEL_STYLE}>Name</label>
-                <input
-                  className="digestt-input"
-                  type="text"
-                  placeholder="e.g. Sarah"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  style={INPUT_STYLE}
-                />
-              </div>
-
-              {/* Niche */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={LABEL_STYLE}>Which option best describes you?</label>
-                <select
-                  className="digestt-input"
-                  value={niche}
-                  onChange={(e) => setNiche(e.target.value as Niche)}
-                  style={{
-                    ...INPUT_STYLE,
-                    appearance: 'none',
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 12px center',
-                    paddingRight: 36,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <option value="designers">Designer using AI</option>
-                  <option value="builders">Builders &amp; founders</option>
-                  <option value="general">General AI &amp; tech</option>
-                </select>
-              </div>
-
               {/* YouTube URL */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={LABEL_STYLE}>YouTube video</label>
+                <label style={LABEL_STYLE}>Video URL</label>
                 <input
                   className="digestt-input"
                   type="text"
@@ -186,6 +160,19 @@ export default function Home() {
                   value={videoUrl}
                   onChange={(e) => setVideoUrl(e.target.value)}
                   required
+                  style={INPUT_STYLE}
+                />
+              </div>
+
+              {/* Goal */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={LABEL_STYLE}>What summary would you like from this video?</label>
+                <input
+                  className="digestt-input"
+                  type="text"
+                  placeholder="e.g. I want to start a similar business"
+                  value={goal}
+                  onChange={(e) => setGoal(e.target.value)}
                   style={INPUT_STYLE}
                 />
               </div>

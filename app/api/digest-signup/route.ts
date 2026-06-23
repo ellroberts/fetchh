@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { Resend } from 'resend'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,6 +8,7 @@ const supabase = createClient(
 )
 
 export async function POST(req: Request) {
+  console.log('RESEND_FROM_EMAIL:', process.env.RESEND_FROM_EMAIL)
   const body = await req.json()
   const { email, channels } = body as { email: string; channels: string[] }
 
@@ -31,6 +33,20 @@ export async function POST(req: Request) {
   if (error) {
     console.error('digest_signups insert error:', error)
     return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 })
+  }
+
+  try {
+    const resend = new Resend(process.env.RESEND_API_KEY)
+    const channelList = trimmed.map((c) => `• ${c}`).join('\n')
+    await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL!,
+      to: email.trim().toLowerCase(),
+      subject: "You're signed up for Digestt",
+      text: `You're on the list!\n\nEvery Monday you'll get a digest of the latest from your channels:\n\n${channelList}\n\nSee you Monday.\n— Digestt`,
+    })
+  } catch (emailError) {
+    console.error('Resend email error:', emailError)
+    console.error('Resend error details:', JSON.stringify(emailError))
   }
 
   return NextResponse.json({ success: true })
