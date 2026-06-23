@@ -116,9 +116,9 @@ export default function TryV2() {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingTop: 56,
+        justifyContent: 'flex-start',
         padding: '80px 16px',
+        paddingTop: 104,
       }}>
         {/* Dog above card */}
         <img src="/coda_cheeky.svg" alt="" style={{ width: 124, height: 124, position: 'relative', zIndex: 1, marginBottom: 32 }} />
@@ -150,22 +150,9 @@ export default function TryV2() {
             {/* Fields */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-              {/* Goal */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={LABEL_STYLE}>What do you want to get out of this video?</label>
-                <input
-                  className="digestt-input"
-                  type="text"
-                  placeholder="e.g. I want to start a similar business"
-                  value={goal}
-                  onChange={(e) => setGoal(e.target.value)}
-                  style={INPUT_STYLE}
-                />
-              </div>
-
               {/* YouTube URL */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={LABEL_STYLE}>YouTube video</label>
+                <label style={LABEL_STYLE}>Video URL</label>
                 <input
                   className="digestt-input"
                   type="text"
@@ -173,6 +160,19 @@ export default function TryV2() {
                   value={videoUrl}
                   onChange={(e) => setVideoUrl(e.target.value)}
                   required
+                  style={INPUT_STYLE}
+                />
+              </div>
+
+              {/* Goal */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={LABEL_STYLE}>What summary would you like from this video?</label>
+                <input
+                  className="digestt-input"
+                  type="text"
+                  placeholder="e.g. I want to start a similar business"
+                  value={goal}
+                  onChange={(e) => setGoal(e.target.value)}
                   style={INPUT_STYLE}
                 />
               </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Copy, Check, Frown, Meh, Smile, Laugh, ArrowRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, Check, Frown, Meh, Smile, Laugh } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -60,11 +60,11 @@ const KEY_TO_DISPLAY: Record<string, string> = {
 }
 
 const TABS = [
-  { key: 'techniques-worth-trying', label: 'What to try' },
-  { key: 'decision-relevant-facts', label: 'Good to know' },
-  { key: 'mental-models', label: 'The big idea' },
-  { key: 'things-to-skip', label: 'What to skip' },
-  { key: 'one-action-this-week', label: 'Do this' },
+  { key: 'techniques-worth-trying', label: 'Try this' },
+  { key: 'decision-relevant-facts', label: 'Worth knowing' },
+  { key: 'mental-models', label: 'New angle' },
+  { key: 'things-to-skip', label: "Don't bother" },
+  { key: 'one-action-this-week', label: 'Next steps' },
 ]
 
 const LOADING_STEPS = [
@@ -155,15 +155,6 @@ function fieldToCards(field: ParsedField): CarouselCard[] {
     const fullText = paragraphs.join('\n\n')
     const dashMatch = fullText.match(/^(.+?)\s*[—–]\s*(.+)/s)
     if (dashMatch && dashMatch[1].length <= 80) return [{ title: normalizeDisplayText(dashMatch[1].trim()), body: normalizeDisplayText(dashMatch[2].trim()) }]
-    // If the text contains pipe separators, treat as title + bullets
-    if (fullText.includes(' | ')) {
-      const parts = fullText.split(' | ').map(s => normalizeDisplayText(s.trim())).filter(Boolean)
-      const colonMatch = parts[0].match(/^([^:]{3,60}):\s*(.+)/s)
-      if (colonMatch) {
-        return [{ title: normalizeDisplayText(colonMatch[1].trim()), body: normalizeDisplayText(colonMatch[2].trim()), bullets: parts.slice(1) }]
-      }
-      return [{ title: field.label, body: parts[0], bullets: parts.slice(1) }]
-    }
     return [{ title: field.label, body: normalizeDisplayText(fullText) }]
   }
   return []
@@ -311,7 +302,7 @@ export default function Try2TokenPage() {
       .replace(/<p[^>]*>\s*-{2,}\s*<\/p>/gi, '')
       .replace(/<p[^>]*>RELEVANT_RESOURCES:[^<]*<\/p>/gi, '') ?? ''
     const fields = isMock ? MOCK_FIELDS : parseCardHtml(cleanedCardHtml)
-    const thumbnailUrl = isMock ? MOCK_META.thumbnailUrl : `https://img.youtube.com/vi/${result!.videoId}/hqdefault.jpg`
+    const thumbnailUrl = isMock ? MOCK_META.thumbnailUrl : `https://img.youtube.com/vi/${result!.videoId}/maxresdefault.jpg`
     const watchUrl = isMock ? MOCK_META.youtubeUrl : `https://www.youtube.com/watch?v=${result!.videoId}`
     const videoTitle = normalizeDisplayText(isMock ? MOCK_META.videoTitle : result!.videoTitle)
     const channelName = isMock ? MOCK_META.channelName : result!.channelName
@@ -377,12 +368,53 @@ export default function Try2TokenPage() {
           justifyContent: 'center',
           padding: '80px 16px',
           paddingTop: 196,
+          position: 'relative',
         }}>
+          {/* Left chevron — outside card */}
+          {totalSlides > 1 && (
+            <button
+              onClick={() => setCardIndex(i => Math.max(0, i - 1))}
+              disabled={safeIndexFull === 0}
+              style={{
+                position: 'absolute',
+                left: 'calc(50% - 400px)',
+                top: 'calc(96px + 196px)',
+                background: 'none', border: 'none',
+                cursor: safeIndexFull === 0 ? 'default' : 'pointer',
+                opacity: safeIndexFull === 0 ? 0.2 : 1,
+                width: 56, height: 56,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 12, padding: 0,
+              }}
+            >
+              <ChevronLeft size={36} color="#000" />
+            </button>
+          )}
+          {/* Right chevron — outside card */}
+          {totalSlides > 1 && (
+            <button
+              onClick={() => setCardIndex(i => Math.min(totalSlides - 1, i + 1))}
+              disabled={safeIndexFull === totalSlides - 1}
+              style={{
+                position: 'absolute',
+                right: 'calc(50% - 400px)',
+                top: 'calc(96px + 196px)',
+                background: 'none', border: 'none',
+                cursor: safeIndexFull === totalSlides - 1 ? 'default' : 'pointer',
+                opacity: safeIndexFull === totalSlides - 1 ? 0.2 : 1,
+                width: 56, height: 56,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 12, padding: 0,
+              }}
+            >
+              <ChevronRight size={36} color="#000" />
+            </button>
+          )}
           <div style={{
             background: '#FFFFFF',
             borderRadius: 24,
             padding: 32,
-            width: 720,
+            width: 600,
             maxWidth: '100%',
             boxShadow: '0px 4px 14px rgba(0,0,0,0.1)',
             display: 'flex',
@@ -400,7 +432,6 @@ export default function Try2TokenPage() {
                     src={thumbnailUrl}
                     alt="Video thumbnail"
                     style={{ width: 215, height: 120, objectFit: 'cover', borderRadius: 6, display: 'block' }}
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
                 </a>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minWidth: 0 }}>
@@ -427,9 +458,11 @@ export default function Try2TokenPage() {
               <div style={{
                 background: 'rgba(229,229,229,0.5)',
                 borderRadius: 8,
-                padding: 4,
+                padding: 8,
                 display: 'flex',
+                gap: 8,
                 alignItems: 'center',
+                flexWrap: 'wrap',
               }}>
                 {visibleTabs.map(tab => {
                   const isActive = tab.key === resolvedTab
@@ -440,18 +473,15 @@ export default function Try2TokenPage() {
                       style={{
                         background: isActive ? '#000' : 'transparent',
                         color: isActive ? '#FFF' : '#000',
-                        borderRadius: 6,
+                        borderRadius: 8,
+                        padding: '4px 12px',
                         border: 'none',
                         cursor: 'pointer',
                         fontSize: 14,
                         fontWeight: 600,
                         fontFamily: FONT,
                         whiteSpace: 'nowrap',
-                        flex: 1,
-                        height: 40,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        lineHeight: '20px',
                       }}
                     >
                       {tab.label}
@@ -466,12 +496,12 @@ export default function Try2TokenPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
 
                 {/* Content */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 200, overflowY: 'auto' }}>
                   {showFeedback ? (
                     /* Feedback card */
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <p style={{ margin: '0 0 8px', fontSize: 32, fontWeight: 800, fontFamily: FONT, color: '#000', lineHeight: '44px' }}>Have these cards been helpful?</p>
-                      <p style={{ margin: '0 0 24px', fontSize: 16, fontWeight: 600, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '28px' }}>Any ideas or suggestions to improve the output? Let us know.</p>
+                      <p style={{ margin: '0 0 24px', fontSize: 16, fontWeight: 400, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '28px' }}>Any ideas or suggestions to improve the output? Let us know.</p>
                       <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
                         {feedbackOptions.map(({ value, label, Icon }) => {
                           const selected = feedbackRating === value
@@ -529,7 +559,7 @@ export default function Try2TokenPage() {
                     /* AI prompt view for Next steps */
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                       {currentCard.title && (
-                        <p style={{ margin: '0 0 4px', fontSize: 32, fontWeight: 800, fontFamily: FONT, color: '#000', lineHeight: '44px', fontStyle: /^[""]/.test(currentCard.title) ? 'italic' : 'normal' }}>
+                        <p style={{ margin: '0 0 4px', fontSize: 32, fontWeight: 800, fontFamily: FONT, color: '#000', lineHeight: '44px' }}>
                           {currentCard.title}
                         </p>
                       )}
@@ -579,20 +609,19 @@ export default function Try2TokenPage() {
                         </p>
                       )}
                       {currentCard.title && (
-                        <p style={{ margin: 0, fontSize: 32, fontWeight: 800, fontFamily: FONT, color: '#000', lineHeight: '44px', fontStyle: /^[""]/.test(currentCard.title) ? 'italic' : 'normal' }}>
+                        <p style={{ margin: 0, fontSize: 32, fontWeight: 800, fontFamily: FONT, color: '#000', lineHeight: '44px' }}>
                           {currentCard.title}
                         </p>
                       )}
                       {currentCard.body && (
-                        <p style={{ margin: 0, fontSize: 18, fontWeight: 400, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '30px' }}>
+                        <p style={{ margin: 0, fontSize: 16, fontWeight: 400, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '28px' }}>
                           {currentCard.body}
                         </p>
                       )}
                       {currentCard.bullets && currentCard.bullets.map((b, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
-                          <ArrowRight size={16} color="rgba(0,0,0,0.4)" style={{ flexShrink: 0, marginTop: 7 }} />
-                          <p style={{ margin: 0, fontSize: 18, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '30px' }}>{b}</p>
-                        </div>
+                        <p key={i} style={{ margin: '4px 0 0', fontSize: 16, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '28px' }}>
+                          • {b}
+                        </p>
                       ))}
                       {currentCard.url && (
                         <a href={currentCard.url} target="_blank" rel="noopener noreferrer" style={{ marginTop: 8, fontSize: 14, color: '#00a9e5', fontFamily: FONT, textDecoration: 'none' }}>
@@ -603,15 +632,8 @@ export default function Try2TokenPage() {
                   )}
                 </div>
 
-                {/* Chevrons + dots row */}
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16, visibility: totalSlides > 1 ? 'visible' : 'hidden' }}>
-                  <button
-                    onClick={() => setCardIndex(i => Math.max(0, i - 1))}
-                    disabled={safeIndexFull === 0}
-                    style={{ background: 'none', border: 'none', cursor: safeIndexFull === 0 ? 'default' : 'pointer', opacity: safeIndexFull === 0 ? 0.2 : 1, padding: 4, display: 'flex', alignItems: 'center' }}
-                  >
-                    <ChevronLeft size={32} color="#000" />
-                  </button>
+                {/* Dots only — chevrons are outside the card */}
+                <div style={{ display: 'flex', justifyContent: 'center', visibility: totalSlides > 1 ? 'visible' : 'hidden' }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     {Array.from({ length: totalSlides }).map((_, i) => (
                       <button
@@ -625,16 +647,44 @@ export default function Try2TokenPage() {
                       />
                     ))}
                   </div>
-                  <button
-                    onClick={() => setCardIndex(i => Math.min(totalSlides - 1, i + 1))}
-                    disabled={safeIndexFull === totalSlides - 1}
-                    style={{ background: 'none', border: 'none', cursor: safeIndexFull === totalSlides - 1 ? 'default' : 'pointer', opacity: safeIndexFull === totalSlides - 1 ? 0.2 : 1, padding: 4, display: 'flex', alignItems: 'center' }}
-                  >
-                    <ChevronRight size={32} color="#000" />
-                  </button>
                 </div>
               </div>
             )}
+          </div>
+        </main>
+      </>
+    )
+  }
+
+  if (status === 'limit_reached') {
+    return (
+      <>
+        <LogoHeader />
+        <main style={{ background: '#ffd19d', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 16px' }}>
+          <div style={{ background: '#FFFFFF', borderRadius: 24, padding: 32, width: 400, maxWidth: '100%', boxShadow: '0px 4px 14px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+            <img src="/coda_cheeky.svg" alt="" style={{ width: 64, height: 64, marginBottom: 24 }} />
+            <h1 style={{ margin: '0 0 12px', fontSize: 28, fontWeight: 800, fontFamily: FONT, color: '#111', lineHeight: 1.2 }}>That&apos;s your 3 previews</h1>
+            <p style={{ margin: '0 0 28px', fontSize: 16, fontFamily: FONT, color: '#555', lineHeight: 1.5 }}>Want a weekly digest of the channels you&apos;re interested in?</p>
+            <button onClick={() => window.location.href = '/'} style={{ background: '#00a9e5', borderRadius: 6, height: 48, width: '100%', border: 'none', cursor: 'pointer', fontSize: 18, fontWeight: 700, fontFamily: FONT, color: '#FFF' }}>
+              Join the waitlist
+            </button>
+          </div>
+        </main>
+      </>
+    )
+  }
+
+  if (status === 'error') {
+    return (
+      <>
+        <LogoHeader />
+        <main style={{ background: '#ffd19d', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 16px' }}>
+          <div style={{ background: '#FFFFFF', borderRadius: 24, padding: 32, width: 400, maxWidth: '100%', boxShadow: '0px 4px 14px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+            <h1 style={{ margin: '0 0 12px', fontSize: 24, fontWeight: 800, fontFamily: FONT, color: '#111' }}>Something went wrong</h1>
+            <p style={{ margin: '0 0 28px', fontSize: 16, fontFamily: FONT, color: '#555', lineHeight: 1.5 }}>We couldn&apos;t process that video. Try a different one or go back.</p>
+            <button onClick={() => window.history.back()} style={{ background: '#00a9e5', borderRadius: 6, height: 48, width: '100%', border: 'none', cursor: 'pointer', fontSize: 18, fontWeight: 700, fontFamily: FONT, color: '#FFF' }}>
+              Go back
+            </button>
           </div>
         </main>
       </>
