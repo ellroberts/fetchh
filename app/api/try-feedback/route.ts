@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL!,
       to: 'elliot.roberts@gmail.com',
-      subject: `Digestt feedback from ${name} — ${tabLabel} — ${ratingLabel}`,
+      subject: `Fetchh feedback from ${name} — ${tabLabel} — ${ratingLabel}`,
       text: `From: ${name}\nNiche: ${niche}\nVideo: ${videoTitle || 'Unknown'}\nTab: ${tabLabel}\nRating: ${ratingLabel}\n\nComment:\n${comment || '(none)'}`,
     })
   } catch (err) {

@@ -88,7 +88,7 @@ export default function Home() {
 
   return (
     <>
-      <style>{`.digestt-input::placeholder { color: #d4cfc8; }`}</style>
+      <style>{`.fetchh-input::placeholder { color: #d4cfc8; }`}</style>
 
       {/* Fixed top nav */}
       <div style={{
@@ -96,7 +96,7 @@ export default function Home() {
         background: '#FFF', boxShadow: '0px 2px 1px rgba(0,0,0,0.05)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
       }}>
-        <img src="/digestt-logo.svg" alt="Digestt" style={{ height: 24 }} />
+        <img src="/fetchh-logo.svg" alt="Fetchh" style={{ height: 24 }} />
       </div>
 
       <main style={{
@@ -143,7 +143,7 @@ export default function Home() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <label style={LABEL_STYLE}>Name</label>
                 <input
-                  className="digestt-input"
+                  className="fetchh-input"
                   type="text"
                   placeholder="e.g. Sarah"
                   value={name}
@@ -157,7 +157,7 @@ export default function Home() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <label style={LABEL_STYLE}>Which option best describes you?</label>
                 <select
-                  className="digestt-input"
+                  className="fetchh-input"
                   value={niche}
                   onChange={(e) => setNiche(e.target.value as Niche)}
                   style={{
@@ -180,7 +180,7 @@ export default function Home() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <label style={LABEL_STYLE}>YouTube video</label>
                 <input
-                  className="digestt-input"
+                  className="fetchh-input"
                   type="text"
                   placeholder="https://www.youtube.com/watch?v=..."
                   value={videoUrl}

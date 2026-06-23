@@ -28,7 +28,7 @@ const LABEL_STYLE: React.CSSProperties = {
   color: '#3d3830',
 }
 
-const LS_KEY = 'digestt_try_token_v2'
+const LS_KEY = 'fetchh_try_token_v2'
 
 export default function TryV2() {
   const router = useRouter()
@@ -99,7 +99,7 @@ export default function TryV2() {
 
   return (
     <>
-      <style>{`.digestt-input::placeholder { color: #d4cfc8; }`}</style>
+      <style>{`.fetchh-input::placeholder { color: #d4cfc8; }`}</style>
 
       {/* Fixed top nav */}
       <div style={{
@@ -107,7 +107,7 @@ export default function TryV2() {
         background: '#FFF', boxShadow: '0px 2px 1px rgba(0,0,0,0.05)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
       }}>
-        <img src="/digestt-logo.svg" alt="Digestt" style={{ height: 24 }} />
+        <img src="/fetchh-logo.svg" alt="Fetchh" style={{ height: 24 }} />
       </div>
 
       <main style={{
@@ -154,7 +154,7 @@ export default function TryV2() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <label style={LABEL_STYLE}>Video URL</label>
                 <input
-                  className="digestt-input"
+                  className="fetchh-input"
                   type="text"
                   placeholder="https://www.youtube.com/watch?v=..."
                   value={videoUrl}
@@ -168,7 +168,7 @@ export default function TryV2() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <label style={LABEL_STYLE}>What summary would you like from this video?</label>
                 <input
-                  className="digestt-input"
+                  className="fetchh-input"
                   type="text"
                   placeholder="e.g. I want to start a similar business"
                   value={goal}
