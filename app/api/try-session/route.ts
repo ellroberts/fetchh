@@ -24,13 +24,13 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const { name, niche, goal } = body as { name?: string; niche?: string; goal?: string | null }
+  const { name, niche, goal, email } = body as { name?: string; niche?: string; goal?: string | null; email?: string | null }
 
   // Goal-only flow (new /try-v2 caller)
   if (!niche) {
     const { data, error } = await supabase
       .from('try_sessions')
-      .insert({ goal: goal ?? null })
+      .insert({ goal: goal ?? null, email: email ?? null })
       .select('token')
       .single()
 

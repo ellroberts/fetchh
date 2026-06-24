@@ -32,6 +32,7 @@ const LS_KEY = 'fetchh_try_token_v2'
 
 export default function TryV2() {
   const router = useRouter()
+  const [email, setEmail] = useState('')
   const [goal, setGoal] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
   const [status, setStatus] = useState<'idle' | 'submitting' | 'error' | 'limit_reached'>('idle')
@@ -57,7 +58,7 @@ export default function TryV2() {
       const res = await fetch('/api/try-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goal: goal.trim() || null }),
+        body: JSON.stringify({ goal: goal.trim() || null, email: email.trim() || null }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -149,6 +150,20 @@ export default function TryV2() {
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Fields */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+              {/* Email */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={LABEL_STYLE}>Email</label>
+                <input
+                  className="fetchh-input"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  style={INPUT_STYLE}
+                />
+              </div>
 
               {/* YouTube URL */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
