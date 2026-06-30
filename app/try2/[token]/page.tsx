@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Copy, Check, Frown, Meh, Smile, Laugh } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, Check, Frown, Meh, Smile, Laugh, ArrowRight } from 'lucide-react'
 
 // ── Typess ──────────────────────────────────────────────────────────────────────
 
@@ -60,11 +60,11 @@ const KEY_TO_DISPLAY: Record<string, string> = {
 }
 
 const TABS = [
-  { key: 'techniques-worth-trying', label: 'Try this' },
-  { key: 'decision-relevant-facts', label: 'Worth knowing' },
-  { key: 'mental-models', label: 'New angle' },
-  { key: 'things-to-skip', label: "Don't bother" },
-  { key: 'one-action-this-week', label: 'Next steps' },
+  { key: 'techniques-worth-trying', label: 'What to try' },
+  { key: 'decision-relevant-facts', label: 'Good to know' },
+  { key: 'mental-models', label: 'The big idea' },
+  { key: 'things-to-skip', label: 'What to skip' },
+  { key: 'one-action-this-week', label: 'Do this' },
 ]
 
 const LOADING_STEPS = [
@@ -368,53 +368,12 @@ export default function Try2TokenPage() {
           justifyContent: 'center',
           padding: '80px 16px',
           paddingTop: 196,
-          position: 'relative',
         }}>
-          {/* Left chevron — outside card */}
-          {totalSlides > 1 && (
-            <button
-              onClick={() => setCardIndex(i => Math.max(0, i - 1))}
-              disabled={safeIndexFull === 0}
-              style={{
-                position: 'absolute',
-                left: 'calc(50% - 400px)',
-                top: 'calc(96px + 196px)',
-                background: 'none', border: 'none',
-                cursor: safeIndexFull === 0 ? 'default' : 'pointer',
-                opacity: safeIndexFull === 0 ? 0.2 : 1,
-                width: 56, height: 56,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                borderRadius: 12, padding: 0,
-              }}
-            >
-              <ChevronLeft size={36} color="#000" />
-            </button>
-          )}
-          {/* Right chevron — outside card */}
-          {totalSlides > 1 && (
-            <button
-              onClick={() => setCardIndex(i => Math.min(totalSlides - 1, i + 1))}
-              disabled={safeIndexFull === totalSlides - 1}
-              style={{
-                position: 'absolute',
-                right: 'calc(50% - 400px)',
-                top: 'calc(96px + 196px)',
-                background: 'none', border: 'none',
-                cursor: safeIndexFull === totalSlides - 1 ? 'default' : 'pointer',
-                opacity: safeIndexFull === totalSlides - 1 ? 0.2 : 1,
-                width: 56, height: 56,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                borderRadius: 12, padding: 0,
-              }}
-            >
-              <ChevronRight size={36} color="#000" />
-            </button>
-          )}
           <div style={{
             background: '#FFFFFF',
             borderRadius: 24,
             padding: 32,
-            width: 600,
+            width: 720,
             maxWidth: '100%',
             boxShadow: '0px 4px 14px rgba(0,0,0,0.1)',
             display: 'flex',
@@ -462,7 +421,7 @@ export default function Try2TokenPage() {
                 display: 'flex',
                 gap: 8,
                 alignItems: 'center',
-                flexWrap: 'wrap',
+                justifyContent: 'space-between',
               }}>
                 {visibleTabs.map(tab => {
                   const isActive = tab.key === resolvedTab
@@ -474,14 +433,18 @@ export default function Try2TokenPage() {
                         background: isActive ? '#000' : 'transparent',
                         color: isActive ? '#FFF' : '#000',
                         borderRadius: 8,
-                        padding: '4px 12px',
+                        padding: '0 12px',
                         border: 'none',
                         cursor: 'pointer',
                         fontSize: 14,
                         fontWeight: 600,
                         fontFamily: FONT,
                         whiteSpace: 'nowrap',
-                        lineHeight: '20px',
+                        flex: 1,
+                        height: 48,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
                     >
                       {tab.label}
@@ -547,7 +510,7 @@ export default function Try2TokenPage() {
                             style={{
                               background: '#00a9e5', borderRadius: 6, height: 44, padding: '0 24px',
                               border: 'none', cursor: 'pointer', fontSize: 16, fontWeight: 700,
-                              fontFamily: FONT, color: '#FFF',
+                              fontFamily: FONT, color: '#FFF', alignSelf: 'flex-start',
                             }}
                           >
                             Send
@@ -619,9 +582,10 @@ export default function Try2TokenPage() {
                         </p>
                       )}
                       {currentCard.bullets && currentCard.bullets.map((b, i) => (
-                        <p key={i} style={{ margin: '4px 0 0', fontSize: 16, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '28px' }}>
-                          • {b}
-                        </p>
+                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
+                          <ArrowRight size={16} color="rgba(0,0,0,0.4)" style={{ flexShrink: 0, marginTop: 6 }} />
+                          <span style={{ fontSize: 16, fontFamily: FONT, color: 'rgba(0,0,0,0.8)', lineHeight: '28px' }}>{b}</span>
+                        </div>
                       ))}
                       {currentCard.url && (
                         <a href={currentCard.url} target="_blank" rel="noopener noreferrer" style={{ marginTop: 8, fontSize: 14, color: '#00a9e5', fontFamily: FONT, textDecoration: 'none' }}>
@@ -632,8 +596,15 @@ export default function Try2TokenPage() {
                   )}
                 </div>
 
-                {/* Dots only — chevrons are outside the card */}
-                <div style={{ display: 'flex', justifyContent: 'center', visibility: totalSlides > 1 ? 'visible' : 'hidden' }}>
+                {/* Dots + chevrons row */}
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16, visibility: totalSlides > 1 ? 'visible' : 'hidden' }}>
+                  <button
+                    onClick={() => setCardIndex(i => Math.max(0, i - 1))}
+                    disabled={safeIndexFull === 0}
+                    style={{ background: 'none', border: 'none', cursor: safeIndexFull === 0 ? 'default' : 'pointer', opacity: safeIndexFull === 0 ? 0.2 : 1, padding: 4, display: 'flex', alignItems: 'center' }}
+                  >
+                    <ChevronLeft size={32} color="#000" />
+                  </button>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     {Array.from({ length: totalSlides }).map((_, i) => (
                       <button
@@ -647,6 +618,13 @@ export default function Try2TokenPage() {
                       />
                     ))}
                   </div>
+                  <button
+                    onClick={() => setCardIndex(i => Math.min(totalSlides - 1, i + 1))}
+                    disabled={safeIndexFull === totalSlides - 1}
+                    style={{ background: 'none', border: 'none', cursor: safeIndexFull === totalSlides - 1 ? 'default' : 'pointer', opacity: safeIndexFull === totalSlides - 1 ? 0.2 : 1, padding: 4, display: 'flex', alignItems: 'center' }}
+                  >
+                    <ChevronRight size={32} color="#000" />
+                  </button>
                 </div>
               </div>
             )}
